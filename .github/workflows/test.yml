@@ -1,0 +1,49 @@
+name: テスト自動実行
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  unit-test:
+    name: ユニットテスト
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: 依存パッケージをインストール
+        run: npm install
+      - name: ユニットテストを実行
+        run: npm test
+
+  e2e-test:
+    name: E2Eテスト
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: 依存パッケージをインストール
+        run: npm install
+      - name: serveをインストール
+        run: npm install -g serve
+      - name: Playwrightブラウザをインストール
+        run: npx playwright install chromium --with-deps
+      - name: サーバーを起動してE2Eテストを実行
+        run: |
+          serve . -p 5500 &
+          sleep 3
+          npm run test:e2e
+      - name: テスト失敗時のスクリーンショットを保存
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-screenshots
+          path: test-results/
