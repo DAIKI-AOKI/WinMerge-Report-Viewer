@@ -12,35 +12,39 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+
       - name: 依存パッケージをインストール
-        run: npm install
+        run: npm ci
+
       - name: ユニットテストを実行
-        run: npm test
+        run: node node_modules/vitest/vitest.mjs run
 
   e2e-test:
     name: E2Eテスト
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+
       - name: 依存パッケージをインストール
-        run: npm install
-      - name: serveをインストール
-        run: npm install -g serve
+        run: npm ci
+
       - name: Playwrightブラウザをインストール
         run: npx playwright install chromium --with-deps
+
       - name: サーバーを起動してE2Eテストを実行
         run: |
-          serve . -p 5500 &
-          sleep 3
-          npm run test:e2e
+          npx serve . -p 5500 &
+          sleep 5
+          npx playwright test
+
       - name: テスト失敗時のスクリーンショットを保存
         if: failure()
         uses: actions/upload-artifact@v4
