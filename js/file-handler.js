@@ -1,0 +1,394 @@
+/**
+ * FileHandler - ファイル処理モジュール（エラーハンドリング改善版）
+ * 依存: config.js, state.js, utils.js, error-handler.js, ui.js, html-processor.js, 
+ *       table-processor.js, marker-manager.js, diff-detector.js, navigation.js
+ * 
+ * @fileoverview ファイルの検証、読み込み、処理の管理
+ */
+
+'use strict';
+
+const FileHandler = (() => {
+    /**
+     * ファイルのバリデーション
+     * @param {File} file - 検証対象ファイル
+     * @returns {boolean} 検証成功時true
+     * @throws {FileValidationError} 検証失敗時
+     */
+    function validate(file) {
+        Logger.log('ファイル検証開始:', file?.name);
+        
+        if (!file) {
+            throw new FileValidationError('ファイルが選択されていません。', 'NO_FILE');
+        }
+        
+        if (!file.name || file.name.trim() === '') {
+            throw new FileValidationError('無効なファイル名です。', 'INVALID_NAME');
+        }
+        
+        const fileName = file.name.toLowerCase();
+        const hasValidExtension = CONFIG.SUPPORTED_EXTENSIONS.some(ext => 
+            fileName.endsWith(ext.toLowerCase())
+        );
+        
+        if (!hasValidExtension) {
+            throw new FileValidationError(
+                `サポートされていないファイル形式です。${CONFIG.SUPPORTED_EXTENSIONS.join(', ')} ファイルを選択してください。`,
+                'INVALID_EXTENSION'
+            );
+        }
+        
+        if (file.size > CONFIG.MAX_FILE_SIZE) {
+            throw new FileValidationError(
+                `ファイルサイズが大きすぎます。最大サイズ: ${Utils.formatFileSize(CONFIG.MAX_FILE_SIZE)}`,
+                'FILE_TOO_LARGE'
+            );
+        }
+        
+        if (file.size === 0) {
+            throw new FileValidationError('ファイルが空です。', 'EMPTY_FILE');
+        }
+        
+        return true;
+    }
+
+    /**
+     * ファイルを処理
+     * @param {File} file - 処理対象ファイル
+     * @returns {void}
+     */
+    function process(file) {
+        Logger.log('ファイル処理開始');
+        
+        if (AppState.isProcessing) {
+            Logger.log('既に処理中です');
+            return;
+        }
+        
+        try {
+            validate(file);
+        } catch (error) {
+            ErrorHandler.handle(error, 'File validation');
+            return;
+        }
+        
+        Logger.log('ファイル検証成功、処理開始');
+        AppState.isProcessing = true;
+        
+        const reader = new FileReader();
+        
+        reader.onload = () => {
+            Logger.log('ファイル読み込み完了');
+            handleLoad(file, reader.result);
+        };
+        
+        reader.onerror = (event) => {
+            const error = new FileProcessingError(
+                'ファイル読み込みに失敗しました。',
+                'read',
+                event.target.error
+            );
+            ErrorHandler.handle(error, 'File reading');
+        };
+        
+        reader.onabort = () => {
+            const error = new FileProcessingError(
+                'ファイル読み込みが中断されました。',
+                'read'
+            );
+            ErrorHandler.handle(error, 'File reading aborted');
+        };
+        
+        reader.readAsText(file, 'utf-8');
+    }
+
+    /**
+     * ファイル読み込み後の処理（オーケストレーター）
+     * 各ステップをプライベート関数に委譲し、全体の流れだけを管理します。
+     * @param {File} file - ファイルオブジェクト
+     * @param {string} content - ファイル内容
+     * @returns {Promise<void>}
+     */
+    async function handleLoad(file, content) {
+        const progress = new ProgressIndicator();
+
+        try {
+            progress.show('WinMergeレポートを処理中');
+
+            await _stepRead(file, content, progress);
+            const sanitized = await _stepSanitize(content, progress);
+            const doc       = await _stepParse(sanitized, progress);
+            const table     = await _stepDetect(doc, progress);
+            await _stepMarker(table, progress);
+            await _stepRender(progress);
+
+            await Utils.sleep(CONFIG.PROGRESS_COMPLETION_DELAY_MS);
+            progress.hide();
+            AppState.isProcessing = false;
+
+            Logger.log('✅ ファイル処理が正常に完了しました');
+
+        } catch (error) {
+            if (progress) {
+                const errorMsg = error.message && error.message.length > 50
+                    ? error.message.substring(0, 47) + '...'
+                    : error.message || 'エラーが発生しました';
+                progress.showError(errorMsg);
+            }
+            ErrorHandler.handle(error, 'File load handling');
+
+        } finally {
+            AppState.isProcessing = false;
+        }
+    }
+
+    // ========================================
+    // ステップ関数（プライベート）
+    // ========================================
+
+    /**
+     * ステップ1: 読み込み準備 (0-20%)
+     * 前回データのクリーンアップ・ファイル情報表示・内容検証を行います。
+     * @private
+     * @param {File} file - ファイルオブジェクト
+     * @param {string} content - ファイル内容
+     * @param {ProgressIndicator} progress - プログレス表示
+     * @returns {Promise<void>}
+     */
+    async function _stepRead(file, content, progress) {
+        progress.updateStepProgress('read', 0);
+        await Utils.sleep(CONFIG.PROGRESS_STEP_DELAY_MS);
+        AppState.cleanupEventHandlers();
+        AppState.cleanupTimers();
+        Navigation.resetInterface();
+        progress.updateStepProgress('read', 50);
+        UI.showFileInfo(file);
+
+        if (!content || content.trim().length === 0) {
+            throw new FileProcessingError('ファイルの内容が空です', 'read');
+        }
+        progress.updateStepProgress('read', 100);
+    }
+
+    /**
+     * ステップ2: サニタイゼーション (20-40%)
+     * XSS等の危険なコードを除去した安全なHTML文字列を返します。
+     * @private
+     * @param {string} content - 元のファイル内容
+     * @param {ProgressIndicator} progress - プログレス表示
+     * @returns {Promise<string>} サニタイズ済みHTML文字列
+     */
+    async function _stepSanitize(content, progress) {
+        progress.updateStepProgress('sanitize', 0);
+        await Utils.sleep(CONFIG.PROGRESS_STEP_DELAY_MS);
+
+        let sanitized;
+        try {
+            sanitized = HTMLProcessor.sanitize(content);
+        } catch (error) {
+            throw new FileProcessingError('HTMLのサニタイゼーションに失敗しました', 'sanitize', error);
+        }
+        progress.updateStepProgress('sanitize', 50);
+
+        if (!sanitized || sanitized.trim().length === 0) {
+            throw new FileProcessingError('サニタイゼーション後にコンテンツが空になりました', 'sanitize');
+        }
+        progress.updateStepProgress('sanitize', 100);
+        return sanitized;
+    }
+
+    /**
+     * ステップ3: DOM解析 (40-50%)
+     * HTML文字列をDOMに変換し、スタイルをインポートします。
+     * @private
+     * @param {string} sanitized - サニタイズ済みHTML文字列
+     * @param {ProgressIndicator} progress - プログレス表示
+     * @returns {Promise<Document>} 解析済みDocumentオブジェクト
+     */
+    async function _stepParse(sanitized, progress) {
+        progress.updateStepProgress('parse', 0);
+        await Utils.sleep(CONFIG.PROGRESS_STEP_DELAY_MS);
+
+        let doc;
+        try {
+            doc = new DOMParser().parseFromString(sanitized, 'text/html');
+            const parserError = doc.querySelector('parsererror');
+            if (parserError) {
+                throw new HTMLParsingError('HTMLの解析中にエラーが発生しました');
+            }
+        } catch (error) {
+            throw new FileProcessingError('DOM解析に失敗しました', 'parse', error);
+        }
+        progress.updateStepProgress('parse', 50);
+
+        try {
+            HTMLProcessor.importStyles(doc);
+        } catch (error) {
+            Logger.warn('スタイルインポートに失敗:', error);
+        }
+        progress.updateStepProgress('parse', 100);
+        return doc;
+    }
+
+    /**
+     * ステップ4: 差分テーブル検出 (50-70%)
+     * Documentから差分テーブルを抽出してviewerに追加します。
+     * @private
+     * @param {Document} doc - 解析済みDocumentオブジェクト
+     * @param {ProgressIndicator} progress - プログレス表示
+     * @returns {Promise<HTMLTableElement>} 差分テーブル要素
+     */
+    async function _stepDetect(doc, progress) {
+        progress.updateStepProgress('detect', 0);
+        await Utils.sleep(CONFIG.PROGRESS_STEP_DELAY_MS);
+
+        let table;
+        try {
+            table = HTMLProcessor.processTable(doc);
+        } catch (error) {
+            throw new TableProcessingError('テーブルの処理に失敗しました', error);
+        }
+        progress.updateStepProgress('detect', 50);
+
+        if (!table) {
+            throw new TableProcessingError('差分テーブルが見つかりませんでした');
+        }
+        AppState.elements.viewer.appendChild(table);
+        progress.updateStepProgress('detect', 100);
+        return table;
+    }
+
+    /**
+     * ステップ5: マーカー生成 (70-90%)
+     * 固定ヘッダー・差分マーカーを生成します。
+     * デバッグモード時はモード切替ボタンも表示します。
+     * @private
+     * @param {HTMLTableElement} table - 差分テーブル要素
+     * @param {ProgressIndicator} progress - プログレス表示
+     * @returns {Promise<void>}
+     */
+    async function _stepMarker(table, progress) {
+        progress.updateStepProgress('marker', 0);
+        await Utils.sleep(CONFIG.PROGRESS_MARKER_DELAY_MS);
+
+        try {
+            TableProcessor.setupFixedHeader(table);
+            progress.updateStepProgress('marker', 20);
+
+            if (Logger.enabled) {
+                MarkerModeToggle.initialize();
+                MarkerModeToggle.show();
+                MarkerManager.generate(table);
+            } else {
+                AppState.useBlockMode = true;
+                AppState.diffBlocks = DiffBlockDetector.detectBlocks(table);
+                BlockMarkerGenerator.generateBlockMarkers(AppState.diffBlocks, table);
+                BlockMarkerGenerator.updateBlockInfo();
+            }
+            progress.updateStepProgress('marker', 60);
+
+            TableProcessor.setupIntersectionObserver();
+            progress.updateStepProgress('marker', 80);
+
+            progress.updateStepProgress('marker', 100);
+        } catch (error) {
+            throw new FileProcessingError('マーカー生成中にエラーが発生しました', 'marker', error);
+        }
+    }
+
+    /**
+     * ステップ6: レンダリング完了処理 (90-100%)
+     * ナビゲーションボタンを接続し、ツールヘッダーを非表示にします。
+     * @private
+     * @param {ProgressIndicator} progress - プログレス表示
+     * @returns {Promise<void>}
+     */
+    async function _stepRender(progress) {
+        progress.updateStepProgress('render', 0);
+        await Utils.sleep(CONFIG.PROGRESS_STEP_DELAY_MS);
+
+        try {
+            AppState.elements.prevDiffButton.onclick = jumpToPrevDiffEnhanced;
+            AppState.elements.nextDiffButton.onclick = jumpToNextDiffEnhanced;
+            progress.updateStepProgress('render', 50);
+
+            CSSManager.hideElement(AppState.elements.toolHeader, 'toolHeader-visible', 'toolHeader-hidden');
+            progress.updateStepProgress('render', 100);
+        } catch (error) {
+            throw new FileProcessingError('レンダリング中にエラーが発生しました', 'render', error);
+        }
+    }
+
+    /**
+     * 拡張版：次の差分へジャンプ
+     * @returns {void}
+     */
+    function jumpToNextDiffEnhanced() {
+        if (AppState.useBlockMode) {
+            if (!AppState.diffBlocks || AppState.diffBlocks.length === 0) {
+                UI.showMessage('ブロックが見つかりません。', 'warning');
+                return;
+            }
+            
+            Navigation.clearCurrentDiffHighlight();
+            
+            const nextIndex = (AppState.currentDiffIndex + 1) % AppState.diffBlocks.length;
+            AppState.currentDiffIndex = nextIndex;
+            
+            const block = AppState.diffBlocks[nextIndex];
+            if (!block || !block.rows || block.rows.length === 0) {
+                Logger.warn('無効なブロック:', nextIndex);
+                return;
+            }
+            
+            BlockMarkerGenerator.jumpToBlock(nextIndex, block);
+        } else {
+            Navigation.jumpToNextDiff();
+        }
+    }
+
+    /**
+     * 拡張版：前の差分へジャンプ
+     * @returns {void}
+     */
+    function jumpToPrevDiffEnhanced() {
+        if (AppState.useBlockMode) {
+            if (!AppState.diffBlocks || AppState.diffBlocks.length === 0) {
+                UI.showMessage('ブロックが見つかりません。', 'warning');
+                return;
+            }
+            
+            Navigation.clearCurrentDiffHighlight();
+            
+            let prevIndex = AppState.currentDiffIndex - 1;
+            if (prevIndex < 0) {
+                prevIndex = AppState.diffBlocks.length - 1;
+            }
+            AppState.currentDiffIndex = prevIndex;
+            
+            const block = AppState.diffBlocks[prevIndex];
+            if (!block || !block.rows || block.rows.length === 0) {
+                Logger.warn('無効なブロック:', prevIndex);
+                return;
+            }
+            
+            BlockMarkerGenerator.jumpToBlock(prevIndex, block);
+        } else {
+            Navigation.jumpToPrevDiff();
+        }
+    }
+
+
+    
+    // 公開API
+    return {
+        validate,
+        process,
+        handleLoad,
+        jumpToNextDiffEnhanced,
+        jumpToPrevDiffEnhanced
+    };
+})();
+
+// ★注意: グローバル汚染を避けるため、直接公開しない
+// main.js で WinMergeViewer.FileHandler としてアクセス可能
