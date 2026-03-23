@@ -7,17 +7,19 @@
  *   - UI.showMessage に渡されるメッセージ・typeが正しいか
  *   - logError() が必要な情報を含むか
  */
+import { UI } from '../js/ui.js';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+afterEach(() => {
+    vi.restoreAllMocks();
+});
 
 // ========================================
 // UI.showMessage のモック
 // ErrorHandler は UI.showMessage を呼ぶため差し替える
 // ========================================
 function setupUIMock() {
-    global.UI = {
-        showMessage: vi.fn(),
-    };
+    vi.spyOn(UI, 'showMessage').mockImplementation(() => {});
 }
 
 // ========================================

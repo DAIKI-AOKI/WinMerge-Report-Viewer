@@ -303,9 +303,4 @@ class ProgressIndicator {
     }
 }
 
-// グローバルに公開
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = ProgressIndicator;
-} else {
-    window.ProgressIndicator = ProgressIndicator;
-}
+export { ProgressIndicator };

@@ -8,6 +8,9 @@
  */
 
 'use strict';
+import { CONFIG } from './config.js';
+import { AppState, Logger } from './state.js';
+import { Utils, CSSManager } from './utils.js';
 
 /**
  * UI制御モジュール
@@ -100,3 +103,5 @@ const UI = {
         }
     }
 };
+
+export { UI };

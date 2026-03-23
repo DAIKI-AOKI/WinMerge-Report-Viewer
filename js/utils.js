@@ -6,6 +6,8 @@
  */
 
 'use strict';
+import { CONFIG } from './config.js';
+import { Logger } from './state.js';
 
 /**
  * ユーティリティ関数群
@@ -298,10 +300,5 @@ const CSSManager = {
  * - 列数・行数も一致している必要がある
  * - 衝突しても実害なし（最悪マーカー再生成のみ）
  */
-// ========================================
-// ⑤ ESM 移行準備（段階的移行 Step 1）
-// ========================================
-// 現在は <script> タグで読み込むためコメントアウト。
-// index.html を type="module" に変更する際は下記のコメントを外してください。
-//
-// export { Utils, CSSManager };
+
+export { Utils, CSSManager };

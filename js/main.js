@@ -8,6 +8,21 @@
 
 'use strict';
 
+import { ProgressIndicator } from './progress-indicator.js';
+import { CONFIG, DRAG_EVENTS, HIGHLIGHT_EVENTS, UNHIGHLIGHT_EVENTS } from './config.js';
+import { FileValidationError, FileProcessingError, HTMLParsingError, TableProcessingError, NavigationError } from './errors.js';
+import { AppState, Logger } from './state.js';
+import { Utils, CSSManager } from './utils.js';
+import { ErrorHandler } from './error-handler.js';
+import { UI } from './ui.js';
+import { HTMLProcessor } from './html-processor.js';
+import { TableProcessor } from './table-processor.js';
+import { MarkerManager } from './marker-manager.js';
+import { DiffBlockDetector, BlockMarkerGenerator } from './diff-detector.js';
+import { Navigation } from './navigation.js';
+import { FileHandler } from './file-handler.js';
+import { EventManager, MarkerModeToggle } from './event-manager.js';
+
 /**
  * @typedef {Object} MemoryInfo
  * @property {number} used - 使用中のヒープサイズ（MB）
@@ -89,6 +104,10 @@ const WinMergeViewer = (() => {
         try {
             setupErrorBoundary();
             AppState.init();
+            MarkerManager.setNavigation(Navigation);
+            BlockMarkerGenerator.setNavigation(Navigation);
+            FileHandler.setMarkerModeToggle(MarkerModeToggle);
+            EventManager.initializeEventListeners();
             EventManager.initializeEventListeners();
             enhanceAccessibility();
             monitorPerformance();

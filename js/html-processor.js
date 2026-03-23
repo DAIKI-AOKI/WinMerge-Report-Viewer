@@ -8,6 +8,10 @@
  */
 
 'use strict';
+import { CONFIG } from './config.js';
+import { AppState, Logger } from './state.js';
+import { TableProcessingError } from './errors.js';
+import { TableProcessor } from './table-processor.js';
 
 /**
  * HTML処理モジュール
@@ -161,3 +165,5 @@ const HTMLProcessor = {
         }
     }
 };
+
+export { HTMLProcessor };

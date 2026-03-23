@@ -163,3 +163,5 @@ const UNHIGHLIGHT_EVENTS = ['dragleave', 'drop'];
 //     localStorage.setItem('winmerge_diffColors', JSON.stringify(config));
 //     CONFIG.DIFF_COLOR_MAP = config;  // 即時反映
 // }
+
+export { CONFIG, DRAG_EVENTS, HIGHLIGHT_EVENTS, UNHIGHLIGHT_EVENTS };

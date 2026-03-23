@@ -7,6 +7,13 @@
  */
 
 'use strict';
+import { CONFIG } from './config.js';
+import { AppState, Logger } from './state.js';
+import { CSSManager } from './utils.js';
+import { FileHandler } from './file-handler.js';
+import { Navigation } from './navigation.js';
+import { DiffBlockDetector, BlockMarkerGenerator } from './diff-detector.js';
+import { MarkerManager } from './marker-manager.js';
 
 const EventManager = (() => {
     /** @type {string[]} ドラッグ&ドロップイベント名の配列 */
@@ -429,3 +436,5 @@ const MarkerModeToggle = (() => {
 
 // ★注意: グローバル汚染を避けるため、直接公開しない
 // main.js で WinMergeViewer.EventManager と WinMergeViewer.MarkerModeToggle としてアクセス可能
+
+export { EventManager, MarkerModeToggle };

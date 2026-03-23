@@ -7,6 +7,20 @@
  */
 
 'use strict';
+import { CONFIG } from './config.js';
+import { FileValidationError, FileProcessingError, HTMLParsingError, TableProcessingError } from './errors.js';
+import { AppState, Logger } from './state.js';
+import { Utils, CSSManager } from './utils.js';
+import { ErrorHandler } from './error-handler.js';
+import { UI } from './ui.js';
+import { HTMLProcessor } from './html-processor.js';
+import { TableProcessor } from './table-processor.js';
+import { MarkerManager } from './marker-manager.js';
+import { DiffBlockDetector, BlockMarkerGenerator } from './diff-detector.js';
+import { Navigation } from './navigation.js';
+import { ProgressIndicator } from './progress-indicator.js';
+let _MarkerModeToggle = null;
+function setMarkerModeToggle(mmt) { _MarkerModeToggle = mmt; }
 
 const FileHandler = (() => {
     /**
@@ -276,8 +290,8 @@ const FileHandler = (() => {
             progress.updateStepProgress('marker', 20);
 
             if (Logger.enabled) {
-                MarkerModeToggle.initialize();
-                MarkerModeToggle.show();
+                _MarkerModeToggle?.initialize();
+                _MarkerModeToggle?.show();
                 MarkerManager.generate(table);
             } else {
                 AppState.useBlockMode = true;
@@ -386,9 +400,12 @@ const FileHandler = (() => {
         process,
         handleLoad,
         jumpToNextDiffEnhanced,
-        jumpToPrevDiffEnhanced
+        jumpToPrevDiffEnhanced,
+        setMarkerModeToggle
     };
 })();
 
 // ★注意: グローバル汚染を避けるため、直接公開しない
 // main.js で WinMergeViewer.FileHandler としてアクセス可能
+
+export { FileHandler };

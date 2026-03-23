@@ -122,16 +122,10 @@ class NavigationError extends Error {
     }
 }
 
-// ========================================
-// ⑤ ESM 移行準備（段階的移行 Step 1）
-// ========================================
-// 現在は <script> タグで読み込むためコメントアウト。
-// index.html を type="module" に変更する際は下記のコメントを外してください。
-//
-// export {
-//     FileValidationError,
-//     FileProcessingError,
-//     HTMLParsingError,
-//     TableProcessingError,
-//     NavigationError,
-// };
+export {
+    FileValidationError,
+    FileProcessingError,
+    HTMLParsingError,
+    TableProcessingError,
+    NavigationError,
+};

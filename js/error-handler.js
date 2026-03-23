@@ -8,6 +8,9 @@
  */
 
 'use strict';
+import { FileValidationError, FileProcessingError, HTMLParsingError, TableProcessingError, NavigationError } from './errors.js';
+import { AppState, Logger } from './state.js';
+import { UI } from './ui.js';
 
 /**
  * エラーハンドリングモジュール
@@ -156,3 +159,5 @@ const ErrorHandler = {
         Logger.error('Error occurred:', errorInfo);
     }
 };
+
+export { ErrorHandler };

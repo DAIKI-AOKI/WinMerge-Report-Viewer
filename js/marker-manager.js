@@ -6,6 +6,13 @@
  */
 
 'use strict';
+import { CONFIG } from './config.js';
+import { AppState, Logger } from './state.js';
+import { Utils, CSSManager } from './utils.js';
+import { TableProcessor } from './table-processor.js';
+
+let _Navigation = null;
+function setNavigation(nav) { _Navigation = nav; }
 
 const MarkerManager = (() => {
     /** @type {boolean} イベント委譲の初期化フラグ */
@@ -169,7 +176,7 @@ const MarkerManager = (() => {
             tr.style.boxShadow = '';
             tr.style.borderRadius = '';
         });
-        Navigation.clearCurrentDiffHighlight();
+        _Navigation?.clearCurrentDiffHighlight();
         AppState.currentDiffIndex = index;
         
         const row = diffInfo.element;
@@ -179,7 +186,7 @@ const MarkerManager = (() => {
         row.style.borderRadius = CONFIG.HIGHLIGHT_BORDER_RADIUS;
         row.scrollIntoView({ behavior: 'smooth', block: 'center' });
         
-        Navigation.highlightSelectedMarker(index);
+        _Navigation?.highlightSelectedMarker(index);
         marker.blur();
         
         AppState.isNavigatingToDiff = true;
@@ -303,9 +310,12 @@ const MarkerManager = (() => {
         generate,
         cleanup,
         updateDiffInfo,
-        cleanupDelegation
+        cleanupDelegation,
+        setNavigation
     };
 })();
 
 // ★注意: グローバル汚染を避けるため、直接公開しない
 // main.js で WinMergeViewer.MarkerManager としてアクセス可能
+
+export { MarkerManager };

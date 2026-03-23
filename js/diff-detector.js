@@ -7,6 +7,13 @@
  */
 
 'use strict';
+import { CONFIG } from './config.js';
+import { AppState, Logger } from './state.js';
+import { CSSManager } from './utils.js';
+import { TableProcessor } from './table-processor.js';
+
+let _Navigation = null;
+function setNavigation(nav) { _Navigation = nav; }
 
 /**
  * @typedef {Object} BlockStats
@@ -329,7 +336,7 @@ const BlockMarkerGenerator = (() => {
             return;
         }
         
-        Navigation.clearCurrentDiffHighlight();
+        _Navigation?.clearCurrentDiffHighlight();
         
         _createBlockHighlight(block);
         
@@ -344,7 +351,7 @@ const BlockMarkerGenerator = (() => {
         AppState.currentDiffIndex = index;
         AppState.isNavigatingToDiff = true;
         
-        Navigation.highlightSelectedMarker(index);
+        _Navigation?.highlightSelectedMarker(index);
         
         setTimeout(() => {
             AppState.isNavigatingToDiff = false;
@@ -547,8 +554,11 @@ const BlockMarkerGenerator = (() => {
         jumpToBlock,
         updateBlockInfo,
         clearBlockMarkers,
+        setNavigation
     };
 })();
 
 // ★注意: グローバル汚染を避けるため、直接公開しない
 // main.js で WinMergeViewer.DiffBlockDetector と WinMergeViewer.BlockMarkerGenerator としてアクセス可能
+
+export { DiffBlockDetector, BlockMarkerGenerator };

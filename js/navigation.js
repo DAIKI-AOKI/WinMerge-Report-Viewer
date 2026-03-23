@@ -6,6 +6,15 @@
  */
 
 'use strict';
+import { CONFIG } from './config.js';
+import { NavigationError } from './errors.js';
+import { AppState, Logger } from './state.js';
+import { CSSManager } from './utils.js';
+import { ErrorHandler } from './error-handler.js';
+import { UI } from './ui.js';
+import { HTMLProcessor } from './html-processor.js';
+import { MarkerManager } from './marker-manager.js';
+import { BlockMarkerGenerator } from './diff-detector.js';
 
 const Navigation = (() => {
     /**
@@ -292,3 +301,5 @@ const Navigation = (() => {
 
 // ★注意: グローバル汚染を避けるため、直接公開しない
 // main.js で WinMergeViewer.Navigation としてアクセス可能
+
+export { Navigation };

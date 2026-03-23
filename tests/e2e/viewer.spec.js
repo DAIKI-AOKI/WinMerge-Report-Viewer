@@ -3,6 +3,32 @@ import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+// デバッグ用：コンソールエラーを出力
+test('デバッグ：コンソールエラー確認', async ({ page }) => {
+    const errors = [];
+    const logs = [];
+    page.on('console', msg => {
+        // すべてのコンソール出力を収集
+        logs.push(`[${msg.type()}] ${msg.text()}`);
+    });
+    page.on('pageerror', err => {
+        errors.push(err.stack || err.message);
+    });
+
+    await page.goto(APP_URL);
+
+    const filePath = path.resolve(__dirname, '../fixtures/sample.htm');
+    await page.locator('#fileInput').setInputFiles(filePath);
+    await page.waitForTimeout(5000);
+
+    console.log('=== pageerror（生のスタック）===');
+    errors.forEach(e => console.log(e));
+    console.log('=== 全コンソール出力 ===');
+    // errorとwarnのみ表示
+    logs.filter(l => l.startsWith('[error]') || l.startsWith('[warn]'))
+        .forEach(l => console.log(l));
+});
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const APP_URL = 'http://localhost:5500';
 
@@ -138,16 +164,14 @@ test.describe('サニタイズ - 不許可タグの除去', () => {
 
     test('p タグはテキストが保持される（DOMParserでは除去不可）', async ({ page }) => {
         const result = await page.evaluate(() => {
-            return HTMLProcessor.sanitize('<p>本文テキスト</p>');
+            return WinMergeViewer.HTMLProcessor.sanitize('<p>本文テキスト</p>');
         });
-        // DOMParser は <p> を有効なHTMLとして扱うため除去されないが
-        // テキスト自体は保持されることを確認する
         expect(result).toContain('本文テキスト');
     });
 
     test('a タグはテキストが保持される（DOMParserでは除去不可）', async ({ page }) => {
         const result = await page.evaluate(() => {
-            return HTMLProcessor.sanitize('<a href="http://example.com">リンク</a>');
+            return WinMergeViewer.HTMLProcessor.sanitize('<a href="http://example.com">リンク</a>');
         });
         expect(result).toContain('リンク');
     });

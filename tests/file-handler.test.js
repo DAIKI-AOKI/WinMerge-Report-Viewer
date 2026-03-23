@@ -38,7 +38,11 @@
  *     - ブロックが 0 件のとき: UI.showMessage() が呼ばれる
  */
 
+import { UI } from '../js/ui.js';
+import { Navigation } from '../js/navigation.js';
+import { BlockMarkerGenerator } from '../js/diff-detector.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { HTMLProcessor } from '../js/html-processor.js';
 
 // ========================================
 // DOM フィクスチャ
@@ -91,27 +95,14 @@ beforeEach(() => {
     AppState.useBlockMode = false;
 
     // 各テストで共通して必要なモック
-    global.UI = {
-        showMessage:  vi.fn(),
-        showFileInfo: vi.fn(),
-        showLoading:  vi.fn(),
-        clearViewer:  vi.fn(),
-    };
-    global.Navigation = {
-        resetInterface:          vi.fn(),
-        clearCurrentDiffHighlight: vi.fn(),
-        clearMarkerSelection:    vi.fn(),
-        jumpToNextDiff:          vi.fn(),
-        jumpToPrevDiff:          vi.fn(),
-        highlightSelectedMarker: vi.fn(),
-    };
-    global.BlockMarkerGenerator = {
-        generateBlockMarkers: vi.fn(),
-        updateBlockInfo:      vi.fn(),
-        jumpToBlock:          vi.fn(),
-        clearBlockMarkers:    vi.fn(),
-        cleanupDelegation:    vi.fn(),
-    };
+    vi.spyOn(UI, 'showMessage').mockImplementation(() => {});
+    vi.spyOn(Navigation, 'resetInterface').mockImplementation(() => {});
+    vi.spyOn(Navigation, 'clearCurrentDiffHighlight').mockImplementation(() => {});
+    vi.spyOn(Navigation, 'jumpToNextDiff').mockImplementation(() => {});
+    vi.spyOn(Navigation, 'jumpToPrevDiff').mockImplementation(() => {});
+    vi.spyOn(Navigation, 'highlightSelectedMarker').mockImplementation(() => {});
+    vi.spyOn(BlockMarkerGenerator, 'jumpToBlock').mockImplementation(() => {});
+    vi.spyOn(BlockMarkerGenerator, 'updateBlockInfo').mockImplementation(() => {});
     global.MarkerManager = {
         generate:          vi.fn(),
         cleanup:           vi.fn(),
@@ -276,7 +267,7 @@ describe('FileHandler.handleLoad() - _stepSanitize', () => {
 it('HTMLProcessor.sanitize() が空を返すと FileProcessingError (sanitize) が発生する', async () => {
     global.ProgressIndicator = vi.fn(() => makeProgressMock());
     const handleSpy = vi.spyOn(ErrorHandler, 'handle').mockImplementation(() => {});
-    global.HTMLProcessor.sanitize = vi.fn(() => '');
+    vi.spyOn(HTMLProcessor, 'sanitize').mockReturnValue('');
 
     const html = '<table><tr><td>A</td></tr></table>';
     await FileHandler.handleLoad(makeFile(), html);

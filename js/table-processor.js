@@ -6,6 +6,9 @@
  */
 
 'use strict';
+import { CONFIG } from './config.js';
+import { AppState, Logger } from './state.js';
+import { CSSManager } from './utils.js';
 
 const TableProcessor = (() => {
     /**
@@ -340,3 +343,5 @@ const TableProcessor = (() => {
 
 // ★注意: グローバル汚染を避けるため、直接公開しない
 // main.js で WinMergeViewer.TableProcessor としてアクセス可能
+
+export { TableProcessor };
