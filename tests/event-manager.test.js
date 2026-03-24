@@ -180,3 +180,80 @@ describe('MarkerModeToggle', () => {
         expect(() => MarkerModeToggle.hide()).not.toThrow();
     });
 });
+
+// ========================================
+// MarkerModeToggle.initialize() / show() / hide()
+// ========================================
+describe('MarkerModeToggle — initialize / show / hide', () => {
+    it('initialize() でボタンが diffContent に追加される', () => {
+        MarkerModeToggle.initialize();
+        const btn = document.getElementById('markerModeToggle');
+        expect(btn).not.toBeNull();
+    });
+
+    it('initialize() を2回呼んでも例外が発生しない', () => {
+        MarkerModeToggle.initialize();
+        expect(() => MarkerModeToggle.initialize()).not.toThrow();
+    });
+
+    it('show() でボタンに button-visible クラスが付く', () => {
+        MarkerModeToggle.initialize();
+        MarkerModeToggle.show();
+        const btn = AppState.elements.markerModeToggle;
+        expect(btn.classList.contains('button-visible')).toBe(true);
+    });
+
+    it('hide() でボタンに button-hidden クラスが付く', () => {
+        MarkerModeToggle.initialize();
+        MarkerModeToggle.show();
+        MarkerModeToggle.hide();
+        const btn = AppState.elements.markerModeToggle;
+        expect(btn.classList.contains('button-hidden')).toBe(true);
+    });
+
+    it('cleanup() でボタンが DOM から削除される', () => {
+        MarkerModeToggle.initialize();
+        MarkerModeToggle.cleanup();
+        expect(document.getElementById('markerModeToggle')).toBeNull();
+    });
+});
+
+// ========================================
+// MarkerModeToggle.toggleMode()
+// ========================================
+describe('MarkerModeToggle.toggleMode()', () => {
+    it('テーブルがない場合は例外が発生しない', () => {
+        MarkerModeToggle.initialize();
+        expect(() => MarkerModeToggle.toggleMode()).not.toThrow();
+    });
+
+    it('テーブルがある場合にブロックモードに切り替わる', () => {
+        MarkerModeToggle.initialize();
+        const table = document.createElement('table');
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.style.backgroundColor = 'rgb(239, 203, 5)';
+        tr.appendChild(td);
+        table.appendChild(tr);
+        AppState.elements.viewer.appendChild(table);
+
+        AppState.useBlockMode = false;
+        MarkerModeToggle.toggleMode();
+        expect(AppState.useBlockMode).toBe(true);
+    });
+
+    it('ブロックモードから行モードに切り替わる', () => {
+        MarkerModeToggle.initialize();
+        const table = document.createElement('table');
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.style.backgroundColor = 'rgb(239, 203, 5)';
+        tr.appendChild(td);
+        table.appendChild(tr);
+        AppState.elements.viewer.appendChild(table);
+
+        AppState.useBlockMode = true;
+        MarkerModeToggle.toggleMode();
+        expect(AppState.useBlockMode).toBe(false);
+    });
+});
