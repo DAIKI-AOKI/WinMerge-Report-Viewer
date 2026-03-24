@@ -16,7 +16,6 @@ export default defineConfig({
             include: ['js/**/*.js'],
             exclude: [
                 'js/main.js',
-                'js/event-manager.js',
                 'js/progress-indicator.js',
             ],
         },
