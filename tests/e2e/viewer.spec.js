@@ -3,32 +3,6 @@ import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-// デバッグ用：コンソールエラーを出力
-test('デバッグ：コンソールエラー確認', async ({ page }) => {
-    const errors = [];
-    const logs = [];
-    page.on('console', msg => {
-        // すべてのコンソール出力を収集
-        logs.push(`[${msg.type()}] ${msg.text()}`);
-    });
-    page.on('pageerror', err => {
-        errors.push(err.stack || err.message);
-    });
-
-    await page.goto(APP_URL);
-
-    const filePath = path.resolve(__dirname, '../fixtures/sample.htm');
-    await page.locator('#fileInput').setInputFiles(filePath);
-    await page.waitForTimeout(5000);
-
-    console.log('=== pageerror（生のスタック）===');
-    errors.forEach(e => console.log(e));
-    console.log('=== 全コンソール出力 ===');
-    // errorとwarnのみ表示
-    logs.filter(l => l.startsWith('[error]') || l.startsWith('[warn]'))
-        .forEach(l => console.log(l));
-});
-
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const APP_URL = 'http://localhost:5500';
 
