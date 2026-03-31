@@ -2,7 +2,7 @@
  * file-handler.js のユニットテスト
  *
  * 検証方針:
- *   【validate()】純粋ロジックのため全パターンを網羅
+ *   validate() の全パターンを網羅:
  *     - null → FileValidationError (NO_FILE)
  *     - 空ファイル名 → FileValidationError (INVALID_NAME)
  *     - 不正拡張子 → FileValidationError (INVALID_EXTENSION)
@@ -10,32 +10,32 @@
  *     - 空ファイル(size=0) → FileValidationError (EMPTY_FILE)
  *     - 正常ファイル → true を返す
  *
- *   【process()】FileReader への委譲と isProcessing ガードを検証
+ *   process(): FileReader への委譲と isProcessing ガードを検証
  *     - isProcessing=true のときは FileReader が起動しない
  *     - validate() 失敗時は ErrorHandler.handle() が呼ばれる
  *     - 正常ファイルで FileReader.readAsText() が呼ばれる
  *
- *   【handleLoad() の各ステップ関数】
+ *   handleLoad() の各ステップ関数:
  *     handleLoad() は6ステップの async チェーンで構成されており、
- *     依存モジュール（Navigation/UI/TableProcessor 等）が多い。
- *     ここではステップ単位の振る舞いを「ステップ関数が呼ぶ依存先」
- *     のモックで検証する。
+ *     各モジュール(Navigation/UI/TableProcessor 等)が多い。
+ *     ここではステップ関数が呼ぶ依存のモックで検証する。
  *
  *     _stepRead:
  *       - content が空のとき FileProcessingError (read) を投げる
- *       - 正常時は Navigation.resetInterface() が呼ばれる
+ *       - 正常時に Navigation.resetInterface() が呼ばれる
  *
  *     _stepSanitize:
- *       - HTMLProcessor.sanitize() が空を返すとき FileProcessingError (sanitize) を投げる
+ *       - HTMLProcessor.sanitize() が空を返すと FileProcessingError (sanitize) を投げる
  *
  *     _stepDetect:
  *       - HTMLProcessor.processTable() が例外を投げると TableProcessingError になる
- *       - 正常時はテーブルが viewer に appendChild される
+ *       - 正常時にテーブルが viewer に appendChild される
  *
- *   【jumpToNextDiffEnhanced() / jumpToPrevDiffEnhanced()】
- *     - ブロックモード時: BlockMarkerGenerator.jumpToBlock() が呼ばれる
- *     - 行モード時: Navigation.jumpToNextDiff() / jumpToPrevDiff() が呼ばれる
- *     - ブロックが 0 件のとき: UI.showMessage() が呼ばれる
+ *   jumpToNextDiffEnhanced() / jumpToPrevDiffEnhanced():
+ *     - ブロックが0件のとき UI.showMessage() が呼ばれる
+ *     - BlockMarkerGenerator.jumpToBlock() が呼ばれる
+ *     - 末尾から次へ → インデックスが 0 に戻る
+ *     - 先頭から前へ → インデックスが末尾に戻る
  */
 
 import { UI } from '../js/ui.js';
@@ -52,7 +52,10 @@ function setupDOM() {
         <input id="fileInput" />
         <div id="viewer"></div>
         <div id="diffContent"></div>
-        <div id="locationPane"></div>
+        <div id="locationPane">
+            <div id="locationPaneLeft"></div>
+            <div id="locationPaneRight"></div>
+        </div>
         <div id="dropArea"></div>
         <button id="resetButton"></button>
         <button id="scrollTopButton"></button>
@@ -92,27 +95,18 @@ beforeEach(() => {
     AppState.isProcessing = false;
     AppState.currentDiffIndex = -1;
     AppState.diffBlocks = [];
-    AppState.useBlockMode = false;
 
     // 各テストで共通して必要なモック
     vi.spyOn(UI, 'showMessage').mockImplementation(() => {});
     vi.spyOn(Navigation, 'resetInterface').mockImplementation(() => {});
     vi.spyOn(Navigation, 'clearCurrentDiffHighlight').mockImplementation(() => {});
-    vi.spyOn(Navigation, 'jumpToNextDiff').mockImplementation(() => {});
-    vi.spyOn(Navigation, 'jumpToPrevDiff').mockImplementation(() => {});
     vi.spyOn(Navigation, 'highlightSelectedMarker').mockImplementation(() => {});
     vi.spyOn(BlockMarkerGenerator, 'jumpToBlock').mockImplementation(() => {});
     vi.spyOn(BlockMarkerGenerator, 'updateBlockInfo').mockImplementation(() => {});
-    global.MarkerManager = {
-        generate:          vi.fn(),
-        cleanup:           vi.fn(),
-        updateDiffInfo:    vi.fn(),
-        cleanupDelegation: vi.fn(),
-    };
     global.TableProcessor = {
-        setupFixedHeader:          vi.fn(),
-        setupIntersectionObserver: vi.fn(),
-        addRightBars:              vi.fn(),
+        setupFixedHeader:            vi.fn(),
+        setupIntersectionObserver:   vi.fn(),
+        addRightBars:                vi.fn(),
         cleanupIntersectionObserver: vi.fn(),
     };
     global.HTMLProcessor = {
@@ -124,12 +118,6 @@ beforeEach(() => {
             return t;
         }),
         removeImportedStyle: vi.fn(),
-    };
-    global.MarkerModeToggle = {
-        initialize: vi.fn(),
-        show:       vi.fn(),
-        hide:       vi.fn(),
-        cleanup:    vi.fn(),
     };
     global.DiffBlockDetector = {
         detectBlocks: vi.fn(() => []),
@@ -151,9 +139,6 @@ describe('FileHandler.validate()', () => {
     });
 
     it('空ファイル名は INVALID_NAME エラーを投げる', () => {
-        const file = makeFile({ name: '   ' });
-        // File API は空白のみの名前を空として扱う実装依存のため
-        // 直接オブジェクトを渡してテスト
         expect(() => FileHandler.validate({ name: '', size: 100 }))
             .toThrow(expect.objectContaining({ code: 'INVALID_NAME' }));
     });
@@ -228,16 +213,14 @@ describe('FileHandler.process()', () => {
         expect(readSpy).toHaveBeenCalledOnce();
     });
 
-    it('validate() 失敗後も isProcessing が false のまま', () => {
+    it('validate() 失敗後も isProcessing は false のまま', () => {
         FileHandler.process(makeFile({ name: 'bad.txt' }));
         expect(AppState.isProcessing).toBe(false);
     });
 });
 
 // ========================================
-// FileHandler.handleLoad() - ステップ単位の検証
-// handleLoad() は全ステップを通す async 関数。
-// 各ステップの依存をモックして振る舞いを検証する。
+// FileHandler.handleLoad() - _stepRead
 // ========================================
 describe('FileHandler.handleLoad() - _stepRead', () => {
 
@@ -262,23 +245,29 @@ describe('FileHandler.handleLoad() - _stepRead', () => {
     });
 });
 
+// ========================================
+// FileHandler.handleLoad() - _stepSanitize
+// ========================================
 describe('FileHandler.handleLoad() - _stepSanitize', () => {
 
-it('HTMLProcessor.sanitize() が空を返すと FileProcessingError (sanitize) が発生する', async () => {
-    global.ProgressIndicator = vi.fn(() => makeProgressMock());
-    const handleSpy = vi.spyOn(ErrorHandler, 'handle').mockImplementation(() => {});
-    vi.spyOn(HTMLProcessor, 'sanitize').mockReturnValue('');
+    it('HTMLProcessor.sanitize() が空を返すと FileProcessingError (sanitize) が発生する', async () => {
+        global.ProgressIndicator = vi.fn(() => makeProgressMock());
+        const handleSpy = vi.spyOn(ErrorHandler, 'handle').mockImplementation(() => {});
+        vi.spyOn(HTMLProcessor, 'sanitize').mockReturnValue('');
 
-    const html = '<table><tr><td>A</td></tr></table>';
-    await FileHandler.handleLoad(makeFile(), html);
+        const html = '<table><tr><td>A</td></tr></table>';
+        await FileHandler.handleLoad(makeFile(), html);
 
-    expect(handleSpy).toHaveBeenCalledOnce();
+        expect(handleSpy).toHaveBeenCalledOnce();
         const err = ErrorHandler.handle.mock.calls[0][0];
         expect(err).toBeInstanceOf(FileProcessingError);
         expect(err.phase).toBe('sanitize');
     });
 });
 
+// ========================================
+// FileHandler.handleLoad() - _stepDetect
+// ========================================
 describe('FileHandler.handleLoad() - _stepDetect', () => {
 
     it('HTMLProcessor.processTable() が例外を投げると TableProcessingError が発生する', async () => {
@@ -297,7 +286,7 @@ describe('FileHandler.handleLoad() - _stepDetect', () => {
         expect(err).toBeInstanceOf(TableProcessingError);
     });
 
-    it('正常時はテーブルが viewer に appendChild される', async () => {
+    it('正常時にテーブルが viewer に appendChild される', async () => {
         global.ProgressIndicator = vi.fn(() => makeProgressMock());
 
         const html = '<table class="diff"><tr><th>A</th></tr></table>';
@@ -310,19 +299,16 @@ describe('FileHandler.handleLoad() - _stepDetect', () => {
 
 // ========================================
 // FileHandler.jumpToNextDiffEnhanced()
-// FileHandler.jumpToPrevDiffEnhanced()
 // ========================================
 describe('FileHandler.jumpToNextDiffEnhanced()', () => {
 
-    it('ブロックが 0 件のとき UI.showMessage が呼ばれる', () => {
-        AppState.useBlockMode = true;
+    it('ブロックが0件のとき UI.showMessage が呼ばれる', () => {
         AppState.diffBlocks = [];
         FileHandler.jumpToNextDiffEnhanced();
         expect(UI.showMessage).toHaveBeenCalledOnce();
     });
 
-    it('ブロックモード時: BlockMarkerGenerator.jumpToBlock() が呼ばれる', () => {
-        AppState.useBlockMode = true;
+    it('BlockMarkerGenerator.jumpToBlock() が呼ばれる', () => {
         AppState.currentDiffIndex = -1;
         AppState.diffBlocks = [{
             id: 0, type: 'changed', color: 'rgb(239,203,5)',
@@ -332,14 +318,7 @@ describe('FileHandler.jumpToNextDiffEnhanced()', () => {
         expect(BlockMarkerGenerator.jumpToBlock).toHaveBeenCalledOnce();
     });
 
-    it('行モード時: Navigation.jumpToNextDiff() が呼ばれる', () => {
-        AppState.useBlockMode = false;
-        FileHandler.jumpToNextDiffEnhanced();
-        expect(Navigation.jumpToNextDiff).toHaveBeenCalledOnce();
-    });
-
-    it('ブロックモードで末尾から次へ → インデックスが 0 に戻る', () => {
-        AppState.useBlockMode = true;
+    it('末尾から次へ → インデックスが 0 に戻る', () => {
         const rows = [document.createElement('tr')];
         AppState.diffBlocks = [
             { id: 0, rows },
@@ -347,21 +326,23 @@ describe('FileHandler.jumpToNextDiffEnhanced()', () => {
         ];
         AppState.currentDiffIndex = 1; // 末尾
         FileHandler.jumpToNextDiffEnhanced();
-        expect(AppState.currentDiffIndex).toBe(0);
+        // jumpToBlock に渡された第1引数が 0 であることを確認
+        expect(BlockMarkerGenerator.jumpToBlock.mock.calls[0][0]).toBe(0);
     });
 });
 
+// ========================================
+// FileHandler.jumpToPrevDiffEnhanced()
+// ========================================
 describe('FileHandler.jumpToPrevDiffEnhanced()', () => {
 
-    it('ブロックが 0 件のとき UI.showMessage が呼ばれる', () => {
-        AppState.useBlockMode = true;
+    it('ブロックが0件のとき UI.showMessage が呼ばれる', () => {
         AppState.diffBlocks = [];
         FileHandler.jumpToPrevDiffEnhanced();
         expect(UI.showMessage).toHaveBeenCalledOnce();
     });
 
-    it('ブロックモード時: BlockMarkerGenerator.jumpToBlock() が呼ばれる', () => {
-        AppState.useBlockMode = true;
+    it('BlockMarkerGenerator.jumpToBlock() が呼ばれる', () => {
         AppState.currentDiffIndex = 1;
         AppState.diffBlocks = [
             { id: 0, rows: [document.createElement('tr')] },
@@ -371,14 +352,7 @@ describe('FileHandler.jumpToPrevDiffEnhanced()', () => {
         expect(BlockMarkerGenerator.jumpToBlock).toHaveBeenCalledOnce();
     });
 
-    it('行モード時: Navigation.jumpToPrevDiff() が呼ばれる', () => {
-        AppState.useBlockMode = false;
-        FileHandler.jumpToPrevDiffEnhanced();
-        expect(Navigation.jumpToPrevDiff).toHaveBeenCalledOnce();
-    });
-
-    it('ブロックモードで先頭から前へ → インデックスが末尾に戻る', () => {
-        AppState.useBlockMode = true;
+    it('先頭から前へ → インデックスが末尾に戻る', () => {
         const rows = [document.createElement('tr')];
         AppState.diffBlocks = [
             { id: 0, rows },
@@ -386,6 +360,7 @@ describe('FileHandler.jumpToPrevDiffEnhanced()', () => {
         ];
         AppState.currentDiffIndex = 0; // 先頭
         FileHandler.jumpToPrevDiffEnhanced();
-        expect(AppState.currentDiffIndex).toBe(1); // 末尾に折り返す
+        // jumpToBlock に渡された第1引数が 1（末尾）であることを確認
+        expect(BlockMarkerGenerator.jumpToBlock.mock.calls[0][0]).toBe(1);
     });
 });
