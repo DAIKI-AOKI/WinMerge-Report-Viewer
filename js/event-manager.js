@@ -1,7 +1,7 @@
 /**
  * EventManager - イベント管理モジュール（メモリリーク完全対策版）
- * ドラッグ&ドロップ、マーカーモード切替、その他のイベントハンドラ
- * 依存: config.js, state.js, file-handler.js, navigation.js, diff-detector.js
+ * ドラッグ&ドロップ、その他のイベントハンドラ
+ * 依存: config.js, state.js, file-handler.js, navigation.js
  * 
  * @fileoverview イベントリスナーの管理とドラッグ&ドロップ処理
  */
@@ -9,11 +9,8 @@
 'use strict';
 import { CONFIG } from './config.js';
 import { AppState, Logger } from './state.js';
-import { CSSManager } from './utils.js';
 import { FileHandler } from './file-handler.js';
 import { Navigation } from './navigation.js';
-import { DiffBlockDetector, BlockMarkerGenerator } from './diff-detector.js';
-import { MarkerManager } from './marker-manager.js';
 
 const EventManager = (() => {
     /** @type {string[]} ドラッグ&ドロップイベント名の配列 */
@@ -37,15 +34,11 @@ const EventManager = (() => {
     };
 
     /**
-     * 現在のモードでの差分総数を返す
-     * ブロックモードと行モードで同じ分岐を各所に書く代わりに、
-     * このヘルパーを使うことで将来のモード追加時の修正箇所を1か所に集約します。
-     * @returns {number} 差分の総数
+     * 差分ブロックの総数を返す
+     * @returns {number} 差分ブロックの総数
      */
     function getTotalDiffCount() {
-        return AppState.useBlockMode
-            ? (AppState.diffBlocks?.length ?? 0)
-            : AppState.diffRows.length;
+        return AppState.diffBlocks?.length ?? 0;
     }
 
     /**
@@ -119,7 +112,6 @@ const EventManager = (() => {
             Navigation.clearMarkerSelection();
             AppState.currentDiffIndex = -1;
 
-            // ③ モード分岐の重複を getTotalDiffCount() で統一
             const total = getTotalDiffCount();
             if (total > 0) {
                 elements.diffInfo.textContent = `差分: 0 / ${total}`;
@@ -253,188 +245,7 @@ const EventManager = (() => {
     };
 })();
 
-// ========================================
-// MarkerModeToggle - マーカーモード切替（メモリリーク対策版）
-// ========================================
-const MarkerModeToggle = (() => {
-    /** @type {HTMLButtonElement|null} 切替ボタンの参照 */
-    let toggleButton = null;
-    
-    /** @type {Function|null} クリックイベントハンドラの参照 */
-    let clickHandler = null;
-    
-    /**
-     * 切替ボタンを初期化
-     * @returns {void}
-     */
-    function initialize() {
-        _createToggleButton();
-    }
-    
-    /**
-     * 切替ボタンを作成
-     * @private
-     * @returns {void}
-     */
-    function _createToggleButton() {
-        const existingBtn = document.getElementById('markerModeToggle');
-        if (existingBtn) {
-            // ★メモリリーク対策: 既存ボタンのイベントリスナーを削除
-            if (clickHandler) {
-                existingBtn.removeEventListener('click', clickHandler);
-            }
-            existingBtn.remove();
-        }
-        
-        const toggleBtn = document.createElement('button');
-        toggleBtn.id = 'markerModeToggle';
-        toggleBtn.className = 'floating-button button-hidden';
-        toggleBtn.innerHTML = '<i class="fas fa-layer-group icon" aria-hidden="true"></i>ブロック表示';
-        
-        toggleBtn.setAttribute('aria-label', 'マーカー表示モードを切り替え');
-        toggleBtn.setAttribute('title', '行単位/ブロック単位を切り替え');
-        
-        // ★メモリリーク対策: ハンドラ参照を保持
-        clickHandler = () => {
-            toggleMode();
-        };
-        toggleBtn.addEventListener('click', clickHandler);
-        
-        AppState.elements.diffContent.appendChild(toggleBtn);
-        AppState.elements.markerModeToggle = toggleBtn;
-        toggleButton = toggleBtn;
-        
-        // 初期状態のCSSクラスを設定（mode-block / mode-line の背景色を適用するため）
-        _updateToggleButton();
-        
-        Logger.log('✅ 切り替えボタンを作成');
-    }
-    
-    /**
-     * マーカーモードを切り替え
-     * @returns {void}
-     */
-    function toggleMode() {
-        const table = AppState.elements.viewer.querySelector('table');
-        if (!table) {
-            Logger.warn('テーブルが見つかりません');
-            return;
-        }
-        
-        AppState.useBlockMode = !AppState.useBlockMode;
-        
-        Logger.log(`マーカーモード切り替え: ${AppState.useBlockMode ? 'ブロック' : '行'}単位`);
-        
-        Navigation.clearCurrentDiffHighlight();
-        AppState.currentDiffIndex = -1;
-        
-        if (AppState.useBlockMode) {
-            _switchToBlockMode(table);
-        } else {
-            _switchToLineMode(table);
-        }
-        
-        _updateToggleButton();
-    }
-    
-    /**
-     * ブロックモードに切替
-     * @private
-     * @param {HTMLTableElement} table - 対象テーブル
-     * @returns {void}
-     */
-    function _switchToBlockMode(table) {
-        MarkerManager.cleanup();
-        AppState.diffBlocks = DiffBlockDetector.detectBlocks(table);
-        BlockMarkerGenerator.generateBlockMarkers(AppState.diffBlocks, table);
-        AppState.currentDiffIndex = -1;
-        BlockMarkerGenerator.updateBlockInfo();
-        
-        Logger.log(`ブロックモード: ${AppState.diffBlocks.length}個のブロック`);
-    }
-    
-    /**
-     * 行単位モードに切替
-     * @private
-     * @param {HTMLTableElement} table - 対象テーブル
-     * @returns {void}
-     */
-    function _switchToLineMode(table) {
-        BlockMarkerGenerator.clearBlockMarkers();
-        MarkerManager.generate(table);
-        
-        Logger.log(`行単位モード: ${AppState.diffRows.length}個の差分行`);
-    }
-    
-    /**
-     * ボタンの表示を更新
-     * @private
-     * @returns {void}
-     */
-    function _updateToggleButton() {
-        const btn = AppState.elements.markerModeToggle;
-        if (!btn) return;
-
-        // style 直接操作をやめ、CSSクラスの付け替えで状態を表現
-        btn.classList.toggle('mode-block', AppState.useBlockMode);
-        btn.classList.toggle('mode-line',  !AppState.useBlockMode);
-
-        if (AppState.useBlockMode) {
-            btn.innerHTML = '<i class="fas fa-list icon" aria-hidden="true"></i>行表示';
-        } else {
-            btn.innerHTML = '<i class="fas fa-layer-group icon" aria-hidden="true"></i>ブロック表示';
-        }
-    }
-    
-    /**
-     * ボタンを表示
-     * @returns {void}
-     */
-    function show() {
-        if (AppState.elements.markerModeToggle) {
-            CSSManager.showElement(AppState.elements.markerModeToggle, 'button-visible', 'button-hidden');
-        }
-    }
-    
-    /**
-     * ボタンを非表示
-     * @returns {void}
-     */
-    function hide() {
-        if (AppState.elements.markerModeToggle) {
-            CSSManager.hideElement(AppState.elements.markerModeToggle, 'button-visible', 'button-hidden');
-        }
-    }
-
-    /**
-     * クリーンアップ（メモリリーク対策）
-     * @returns {void}
-     */
-    function cleanup() {
-        if (toggleButton && clickHandler) {
-            toggleButton.removeEventListener('click', clickHandler);
-            clickHandler = null;
-            Logger.log('✅ MarkerModeToggle clickハンドラを削除');
-        }
-        
-        if (toggleButton && toggleButton.parentNode) {
-            toggleButton.remove();
-            toggleButton = null;
-            Logger.log('✅ MarkerModeToggle ボタンを削除');
-        }
-    }
-
-    // 公開API
-    return {
-        initialize,
-        toggleMode,
-        show,
-        hide,
-        cleanup
-    };
-})();
-
 // ★注意: グローバル汚染を避けるため、直接公開しない
-// main.js で WinMergeViewer.EventManager と WinMergeViewer.MarkerModeToggle としてアクセス可能
+// main.js で WinMergeViewer.EventManager としてアクセス可能
 
-export { EventManager, MarkerModeToggle };
+export { EventManager };

@@ -1,5 +1,5 @@
 /**
- * Main - アプリケーション初期化・統合モジュール (改善版 v6.1)
+ * Main - アプリケーション初期化・統合モジュール (改善版 v6.2)
  * すべてのモジュールを統合し、アプリケーションを起動
  * 依存: すべてのモジュール
  * 
@@ -9,7 +9,7 @@
 'use strict';
 
 import { ProgressIndicator } from './progress-indicator.js';
-import { CONFIG, DRAG_EVENTS, HIGHLIGHT_EVENTS, UNHIGHLIGHT_EVENTS } from './config.js';
+import { CONFIG } from './config.js';
 import { FileValidationError, FileProcessingError, HTMLParsingError, TableProcessingError, NavigationError } from './errors.js';
 import { AppState, Logger } from './state.js';
 import { Utils, CSSManager } from './utils.js';
@@ -17,11 +17,10 @@ import { ErrorHandler } from './error-handler.js';
 import { UI } from './ui.js';
 import { HTMLProcessor } from './html-processor.js';
 import { TableProcessor } from './table-processor.js';
-import { MarkerManager } from './marker-manager.js';
 import { DiffBlockDetector, BlockMarkerGenerator } from './diff-detector.js';
 import { Navigation } from './navigation.js';
 import { FileHandler } from './file-handler.js';
-import { EventManager, MarkerModeToggle } from './event-manager.js';
+import { EventManager } from './event-manager.js';
 
 /**
  * @typedef {Object} MemoryInfo
@@ -104,26 +103,12 @@ const WinMergeViewer = (() => {
         try {
             setupErrorBoundary();
             AppState.init();
-            MarkerManager.setNavigation(Navigation);
             BlockMarkerGenerator.setNavigation(Navigation);
-            FileHandler.setMarkerModeToggle(MarkerModeToggle);
-            EventManager.initializeEventListeners();
             EventManager.initializeEventListeners();
             enhanceAccessibility();
             monitorPerformance();
             
-            Logger.log('WinMerge Diff Report Viewer v6.1 initialized');
-            Logger.log('Mode: Block-first with optional line mode in debug');
-            Logger.log('Memory Leak Prevention: Enhanced');
-            Logger.log('Code Consistency: Improved (JSDoc unified, constants consolidated)');
-            
-            if (Logger.enabled) {
-                console.log('');
-                console.log('=== デバッグモードが有効です ===');
-                console.log('- 行/ブロック切り替えボタンが表示されます');
-                console.log('- 通常モードでは自動的にブロック表示になります');
-                console.log('');
-            }
+            Logger.log('WinMerge Diff Report Viewer v6.2 initialized');
         } catch (error) {
             Logger.error('アプリケーション初期化エラー:', error);
             UI.showMessage('アプリケーションの初期化に失敗しました。ページをリロードしてください。');
@@ -141,21 +126,9 @@ const WinMergeViewer = (() => {
                 AppState.cleanupTimers();
                 AppState.cleanupEventHandlers();
                 
-                if (typeof MarkerManager !== 'undefined' && MarkerManager.cleanup) {
-                    MarkerManager.cleanup();
-                }
-                
-                if (typeof BlockMarkerGenerator !== 'undefined' && BlockMarkerGenerator.cleanup) {
-                    BlockMarkerGenerator.cleanup();
-                }
-                
-                if (typeof EventManager !== 'undefined' && EventManager.cleanup) {
-                    EventManager.cleanup();
-                }
-                
-                if (typeof MarkerModeToggle !== 'undefined' && MarkerModeToggle.cleanup) {
-                    MarkerModeToggle.cleanup();
-                }
+                // import 済みのモジュールは undefined にならないため typeof チェック不要
+                BlockMarkerGenerator.cleanup();
+                EventManager.cleanup();
                 
                 if (AppState.intersectionObserver) {
                     AppState.intersectionObserver.disconnect();
@@ -209,15 +182,24 @@ const WinMergeViewer = (() => {
             
             console.log('=== ブロック統計 ===');
             console.log('総ブロック数:', stats.total);
-            // 'add' カテゴリ = changed / word（変更系）、'del' カテゴリ = del / moved_from / moved_to（削除系）
             console.log('変更系ブロック:', stats.addBlocks, `(${stats.totalAddLines}行)`, '--- changed / word');
             console.log('削除系ブロック:', stats.delBlocks, `(${stats.totalDelLines}行)`, '--- del / moved_from / moved_to');
             console.log('平均ブロックサイズ:', stats.averageBlockSize.toFixed(2), '行');
             console.log('');
             console.log('=== ブロック詳細 ===');
+            // type は CONFIG.DIFF_COLOR_MAP の type 値（'changed'/'word'/'del'/'moved_from'/'moved_to'/'separator'）
+            const TYPE_LABEL = {
+                changed:    '変更行',
+                word:       '行内差分',
+                del:        '削除・追加行',
+                moved_from: '移動元',
+                moved_to:   '移動先',
+                separator:  '区切り行',
+                unknown:    '不明',
+            };
             console.table(blocks.map(b => ({
                 ID: b.id + 1,
-                タイプ: b.type === 'add' ? '追加' : '削除',
+                タイプ: TYPE_LABEL[b.type] ?? b.type,
                 行数: b.rows.length,
                 開始行: b.startIndex,
                 終了行: b.endIndex
@@ -282,7 +264,6 @@ const WinMergeViewer = (() => {
          */
         blockMode() {
             console.log('=== Block Mode Status ===');
-            console.log('useBlockMode:', AppState.useBlockMode);
             console.log('diffBlocks length:', AppState.diffBlocks?.length || 0);
             console.log('currentDiffIndex:', AppState.currentDiffIndex);
         },
@@ -314,8 +295,6 @@ const WinMergeViewer = (() => {
         appState() {
             console.log('=== AppState Status ===');
             console.log('isProcessing:', AppState.isProcessing);
-            console.log('useBlockMode:', AppState.useBlockMode);
-            console.log('diffRows count:', AppState.diffRows.length);
             console.log('diffBlocks count:', AppState.diffBlocks?.length || 0);
             console.log('currentDiffIndex:', AppState.currentDiffIndex);
         },
@@ -336,7 +315,7 @@ const WinMergeViewer = (() => {
     // 公開API - すべてのモジュールを統合
     return {
         // バージョン情報
-        version: '6.1.0',
+        version: '6.2.0',
         
         // 初期化
         init: () => {
@@ -373,10 +352,8 @@ const WinMergeViewer = (() => {
         Navigation,
         
         // マーカー管理
-        MarkerManager,
         DiffBlockDetector,
         BlockMarkerGenerator,
-        MarkerModeToggle,
         
         // イベント管理
         EventManager,
@@ -401,9 +378,12 @@ if (document.readyState === 'loading') {
 }
 
 // ========================================
-// グローバルオブジェクト公開
+// グローバルオブジェクト公開（デバッグモード時のみ）
+// 本番環境では内部モジュールをコンソールから操作できないよう制限する
 // ========================================
-window.WinMergeViewer = WinMergeViewer;
+if (WinMergeViewer.Logger.enabled) {
+    window.WinMergeViewer = WinMergeViewer;
+}
 
 // ========================================
 // デバッグ関数のグローバル公開（デバッグモード時のみ）
@@ -433,17 +413,8 @@ if (WinMergeViewer.debug && WinMergeViewer.Logger.enabled) {
 // 起動ログはデバッグモード時のみ出力
 if (WinMergeViewer.Logger.enabled) {
     console.log('');
-    console.log('=== WinMerge Report Viewer v6.1 (改善版) ===');
-    console.log('✅ JSDoc統一: すべての関数に適切なドキュメント追加');
-    console.log('✅ 定数統合: UI_CONSTANTS → CONFIG.CONTROL_BUTTONS');
-    console.log('✅ コードの一貫性向上: 命名規則・コメントスタイル統一');
-    console.log('✅ メモリリーク対策: イベントリスナーの完全クリーンアップ');
-    console.log('');
-    console.log('📦 利用可能なモジュール:');
-    console.log('  WinMergeViewer.FileHandler');
-    console.log('  WinMergeViewer.Navigation');
-    console.log('  WinMergeViewer.MarkerManager');
-    console.log('  WinMergeViewer.Utils');
-    console.log('  ... その他すべてのモジュール');
+    console.log('=== WinMerge Report Viewer v6.2 ===');
+    console.log('📦 WinMergeViewer オブジェクトからすべてのモジュールにアクセス可能');
+    console.log('🐛 デバッグ: wmv.debug.all() で状態確認');
     console.log('');
 }

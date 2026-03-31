@@ -1,7 +1,7 @@
 /**
  * FileHandler - ファイル処理モジュール（エラーハンドリング改善版）
  * 依存: config.js, state.js, utils.js, error-handler.js, ui.js, html-processor.js, 
- *       table-processor.js, marker-manager.js, diff-detector.js, navigation.js
+ *       table-processor.js, diff-detector.js, navigation.js
  * 
  * @fileoverview ファイルの検証、読み込み、処理の管理
  */
@@ -15,12 +15,9 @@ import { ErrorHandler } from './error-handler.js';
 import { UI } from './ui.js';
 import { HTMLProcessor } from './html-processor.js';
 import { TableProcessor } from './table-processor.js';
-import { MarkerManager } from './marker-manager.js';
 import { DiffBlockDetector, BlockMarkerGenerator } from './diff-detector.js';
 import { Navigation } from './navigation.js';
 import { ProgressIndicator } from './progress-indicator.js';
-let _MarkerModeToggle = null;
-function setMarkerModeToggle(mmt) { _MarkerModeToggle = mmt; }
 
 const FileHandler = (() => {
     /**
@@ -91,9 +88,19 @@ const FileHandler = (() => {
         
         const reader = new FileReader();
         
-        reader.onload = () => {
-            Logger.log('ファイル読み込み完了');
-            handleLoad(file, reader.result);
+        reader.onload = async () => {
+            Logger.log('ファイル読み込み完了 (UTF-8)');
+            try {
+                const content = await _rereadAsShiftJisIfNeeded(file, reader.result);
+                handleLoad(file, content);
+            } catch (e) {
+                const error = new FileProcessingError(
+                    'ファイルの文字コード変換に失敗しました。',
+                    'read',
+                    e
+                );
+                ErrorHandler.handle(error, 'Encoding re-read');
+            }
         };
         
         reader.onerror = (event) => {
@@ -113,7 +120,32 @@ const FileHandler = (() => {
             ErrorHandler.handle(error, 'File reading aborted');
         };
         
+        // Shift-JIS で保存された WinMerge レポートにも対応するため、
+        // まず UTF-8 で読み込み、文字化けを検出した場合は Shift-JIS で再読込する。
+        // 文字化け判定: UTF-8 デコード結果に replacement character (U+FFFD) が含まれるかで判断する。
         reader.readAsText(file, 'utf-8');
+    }
+
+    /**
+     * エンコーディングを自動判定してファイルを再読込する
+     * UTF-8 デコード結果に U+FFFD が含まれる場合に Shift-JIS で読み直す。
+     * @param {File} file - 対象ファイル
+     * @param {string} utf8Content - UTF-8 で読み込んだ内容
+     * @returns {Promise<string>} 正しいエンコーディングで読み込んだ内容
+     */
+    function _rereadAsShiftJisIfNeeded(file, utf8Content) {
+        // U+FFFD (replacement character) が含まれない場合は UTF-8 で問題なし
+        if (!utf8Content.includes('\uFFFD')) {
+            return Promise.resolve(utf8Content);
+        }
+        
+        Logger.log('U+FFFD を検出: Shift-JIS で再読込します');
+        return new Promise((resolve, reject) => {
+            const sjisReader = new FileReader();
+            sjisReader.onload = () => resolve(sjisReader.result);
+            sjisReader.onerror = (e) => reject(e.target.error);
+            sjisReader.readAsText(file, 'shift-jis');
+        });
     }
 
     /**
@@ -138,8 +170,7 @@ const FileHandler = (() => {
 
             await Utils.sleep(CONFIG.PROGRESS_COMPLETION_DELAY_MS);
             progress.hide();
-            AppState.isProcessing = false;
-
+            // isProcessing は finally で確実にリセットされるため、ここでは不要
             Logger.log('✅ ファイル処理が正常に完了しました');
 
         } catch (error) {
@@ -172,8 +203,8 @@ const FileHandler = (() => {
     async function _stepRead(file, content, progress) {
         progress.updateStepProgress('read', 0);
         await Utils.sleep(CONFIG.PROGRESS_STEP_DELAY_MS);
-        AppState.cleanupEventHandlers();
-        AppState.cleanupTimers();
+        // Navigation.resetInterface() の内部で cleanupTimers / cleanupEventHandlers /
+        // AppState.reset() が順に呼ばれるため、ここでの個別呼び出しは不要
         Navigation.resetInterface();
         progress.updateStepProgress('read', 50);
         UI.showFileInfo(file);
@@ -260,6 +291,9 @@ const FileHandler = (() => {
         try {
             table = HTMLProcessor.processTable(doc);
         } catch (error) {
+            // HTMLProcessor.processTable が TableProcessingError を投げる場合は
+            // 再ラップせずそのまま再スローする（スタックトレースの二重化を防ぐ）
+            if (error instanceof TableProcessingError) throw error;
             throw new TableProcessingError('テーブルの処理に失敗しました', error);
         }
         progress.updateStepProgress('detect', 50);
@@ -275,7 +309,7 @@ const FileHandler = (() => {
     /**
      * ステップ5: マーカー生成 (70-90%)
      * 固定ヘッダー・差分マーカーを生成します。
-     * デバッグモード時はモード切替ボタンも表示します。
+     * デバッグモード時（?debug=true / localhost）はモード切替ボタンも表示します。
      * @private
      * @param {HTMLTableElement} table - 差分テーブル要素
      * @param {ProgressIndicator} progress - プログレス表示
@@ -289,20 +323,33 @@ const FileHandler = (() => {
             TableProcessor.setupFixedHeader(table);
             progress.updateStepProgress('marker', 20);
 
-            if (Logger.enabled) {
-                _MarkerModeToggle?.initialize();
-                _MarkerModeToggle?.show();
-                MarkerManager.generate(table);
-            } else {
-                AppState.useBlockMode = true;
-                AppState.diffBlocks = DiffBlockDetector.detectBlocks(table);
-                BlockMarkerGenerator.generateBlockMarkers(AppState.diffBlocks, table);
-                BlockMarkerGenerator.updateBlockInfo();
-            }
+            // ブロックモードで差分ブロックを検出・マーカー生成
+            AppState.diffBlocks = DiffBlockDetector.detectBlocks(table);
+            BlockMarkerGenerator.generateBlockMarkers(AppState.diffBlocks, table);
+            BlockMarkerGenerator.updateBlockInfo();
             progress.updateStepProgress('marker', 60);
 
             TableProcessor.setupIntersectionObserver();
             progress.updateStepProgress('marker', 80);
+
+            // リサイズ時のミニマップマーカー再配置コールバックを登録
+            // table-processor.js は diff-detector.js をimportできない（循環依存）ため、
+            // このコールバック経由でマーカー位置を再計算する
+            AppState.eventHandlers.markerResizeCallback = () => {
+                if (!AppState.diffBlocks?.length) return;
+
+                // ブロックハイライト枠を更新
+                BlockMarkerGenerator.updateBlockHighlight();
+
+                // ミニマップマーカーを再配置（ペインサイズ・スクロール高さが変わるため）
+                const currentTable = AppState.elements.viewer.querySelector('table');
+                if (!currentTable) return;
+
+                BlockMarkerGenerator.clearBlockMarkers();
+                BlockMarkerGenerator.generateBlockMarkers(AppState.diffBlocks, currentTable);
+                Logger.log('✅ リサイズ後のミニマップマーカーを再配置');
+
+            };
 
             progress.updateStepProgress('marker', 100);
         } catch (error) {
@@ -335,61 +382,54 @@ const FileHandler = (() => {
 
     /**
      * 拡張版：次の差分へジャンプ
+     * 常にブロックモードで動作する（行表示モードは廃止）。
      * @returns {void}
      */
     function jumpToNextDiffEnhanced() {
-        if (AppState.useBlockMode) {
-            if (!AppState.diffBlocks || AppState.diffBlocks.length === 0) {
-                UI.showMessage('ブロックが見つかりません。', 'warning');
-                return;
-            }
-            
-            Navigation.clearCurrentDiffHighlight();
-            
-            const nextIndex = (AppState.currentDiffIndex + 1) % AppState.diffBlocks.length;
-            AppState.currentDiffIndex = nextIndex;
-            
-            const block = AppState.diffBlocks[nextIndex];
-            if (!block || !block.rows || block.rows.length === 0) {
-                Logger.warn('無効なブロック:', nextIndex);
-                return;
-            }
-            
-            BlockMarkerGenerator.jumpToBlock(nextIndex, block);
-        } else {
-            Navigation.jumpToNextDiff();
+        if (!AppState.diffBlocks || AppState.diffBlocks.length === 0) {
+            UI.showMessage('ブロックが見つかりません。', 'warning');
+            return;
         }
+        
+        Navigation.clearCurrentDiffHighlight();
+        
+        const nextIndex = (AppState.currentDiffIndex + 1) % AppState.diffBlocks.length;
+        // currentDiffIndex の更新は jumpToBlock 内で一元管理するため、ここでは行わない
+        
+        const block = AppState.diffBlocks[nextIndex];
+        if (!block || !block.rows || block.rows.length === 0) {
+            Logger.warn('無効なブロック:', nextIndex);
+            return;
+        }
+        
+        BlockMarkerGenerator.jumpToBlock(nextIndex, block);
     }
 
     /**
      * 拡張版：前の差分へジャンプ
+     * 常にブロックモードで動作する（行表示モードは廃止）。
      * @returns {void}
      */
     function jumpToPrevDiffEnhanced() {
-        if (AppState.useBlockMode) {
-            if (!AppState.diffBlocks || AppState.diffBlocks.length === 0) {
-                UI.showMessage('ブロックが見つかりません。', 'warning');
-                return;
-            }
-            
-            Navigation.clearCurrentDiffHighlight();
-            
-            let prevIndex = AppState.currentDiffIndex - 1;
-            if (prevIndex < 0) {
-                prevIndex = AppState.diffBlocks.length - 1;
-            }
-            AppState.currentDiffIndex = prevIndex;
-            
-            const block = AppState.diffBlocks[prevIndex];
-            if (!block || !block.rows || block.rows.length === 0) {
-                Logger.warn('無効なブロック:', prevIndex);
-                return;
-            }
-            
-            BlockMarkerGenerator.jumpToBlock(prevIndex, block);
-        } else {
-            Navigation.jumpToPrevDiff();
+        if (!AppState.diffBlocks || AppState.diffBlocks.length === 0) {
+            UI.showMessage('ブロックが見つかりません。', 'warning');
+            return;
         }
+        
+        Navigation.clearCurrentDiffHighlight();
+        
+        const prevIndex = AppState.currentDiffIndex <= 0
+            ? AppState.diffBlocks.length - 1
+            : AppState.currentDiffIndex - 1;
+        // currentDiffIndex の更新は jumpToBlock 内で一元管理するため、ここでは行わない
+        
+        const block = AppState.diffBlocks[prevIndex];
+        if (!block || !block.rows || block.rows.length === 0) {
+            Logger.warn('無効なブロック:', prevIndex);
+            return;
+        }
+        
+        BlockMarkerGenerator.jumpToBlock(prevIndex, block);
     }
 
 
@@ -400,8 +440,7 @@ const FileHandler = (() => {
         process,
         handleLoad,
         jumpToNextDiffEnhanced,
-        jumpToPrevDiffEnhanced,
-        setMarkerModeToggle
+        jumpToPrevDiffEnhanced
     };
 })();
 
