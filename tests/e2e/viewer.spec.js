@@ -23,7 +23,6 @@ test.describe('ファイル読み込み', () => {
         const filePath = path.resolve(__dirname, '../fixtures/sample.htm');
         await page.locator('#fileInput').setInputFiles(filePath);
 
-        // テーブルが表示されるまで待機
         await expect(page.locator('table.diff')).toBeVisible({ timeout: 5000 });
     });
 
@@ -61,7 +60,6 @@ test.describe('差分ナビゲーション', () => {
 
     test('「次の差分」ボタンで差分にジャンプする', async ({ page }) => {
         await page.locator('#nextDiffButton').click();
-        // 差分情報が更新される
         await expect(page.locator('#diffInfo')).toContainText('差分: 1');
     });
 
@@ -74,10 +72,13 @@ test.describe('差分ナビゲーション', () => {
     });
 
     test('ミニマップのマーカーが表示される', async ({ page }) => {
-        // 少なくとも1件以上のマーカーが存在する
-        await expect(page.locator('#locationPane .marker').first()).toBeVisible({ timeout: 5000 });
-        // sample.htm には差分行が2行あるので2件のマーカーが生成される
-        await expect(page.locator('#locationPane .marker')).toHaveCount(2);
+        // v2 では locationPaneLeft / locationPaneRight の2ペインにそれぞれマーカーが生成される。
+        // 差分ブロックの左右の色の有無によって総数が変わるため、
+        // 絶対数ではなく「1件以上存在すること」と「左右ペイン個別の存在」を確認する。
+        await expect(page.locator('#locationPaneLeft .marker').first()).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('#locationPaneRight .marker').first()).toBeVisible({ timeout: 5000 });
+        const count = await page.locator('#locationPane .marker').count();
+        expect(count).toBeGreaterThanOrEqual(1);
     });
 });
 
@@ -105,7 +106,6 @@ test.describe('セキュリティ', () => {
     test('scriptタグを含むファイルを読み込んでもXSSが発生しない', async ({ page }) => {
         await page.goto(APP_URL);
 
-        // XSSペイロードを埋め込んだHTMファイルを生成
         const xssContent = `
             <table class="diff">
                 <tr><td onclick="alert('XSS')">テスト</td></tr>
@@ -121,7 +121,6 @@ test.describe('セキュリティ', () => {
 
         await expect(page.locator('table.diff')).toBeVisible({ timeout: 5000 });
 
-        // XSSが実行されていないことを確認
         const xssExecuted = await page.evaluate(() => window.__xss);
         expect(xssExecuted).toBeUndefined();
     });
@@ -130,20 +129,20 @@ test.describe('セキュリティ', () => {
 // ========================================
 // サニタイズ（ブラウザ環境での動作確認）
 // ========================================
-test.describe('サニタイズ - 不許可タグの除去', () => {
+test.describe('サニタイズ - 非許可タグの除外', () => {
 
     test.beforeEach(async ({ page }) => {
         await page.goto(APP_URL);
     });
 
-    test('p タグはテキストが保持される（DOMParserでは除去不可）', async ({ page }) => {
+    test('p タグはテキストが保持される（DOMParserでは除外不可）', async ({ page }) => {
         const result = await page.evaluate(() => {
             return WinMergeViewer.HTMLProcessor.sanitize('<p>本文テキスト</p>');
         });
         expect(result).toContain('本文テキスト');
     });
 
-    test('a タグはテキストが保持される（DOMParserでは除去不可）', async ({ page }) => {
+    test('a タグはテキストが保持される（DOMParserでは除外不可）', async ({ page }) => {
         const result = await page.evaluate(() => {
             return WinMergeViewer.HTMLProcessor.sanitize('<a href="http://example.com">リンク</a>');
         });
@@ -160,7 +159,6 @@ test.describe('実WinMergeファイル - small-file.htm', () => {
         await page.goto(APP_URL);
         const filePath = path.resolve(__dirname, '../fixtures/small-file.htm');
         await page.locator('#fileInput').setInputFiles(filePath);
-        // #viewer 内のテーブルに絞る
         await expect(page.locator('#viewer table')).toBeVisible({ timeout: 10000 });
     });
 
