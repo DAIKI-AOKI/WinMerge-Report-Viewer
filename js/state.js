@@ -12,10 +12,10 @@
 /**
  * @typedef {Object} EventHandlers
  * @property {Function|null} keydown - キーボードイベントハンドラ
- * @property {Function|null} smoothUpdateViewport - ビューポート更新ハンドラ
  * @property {Function|null} debouncedResize - リサイズデバウンスハンドラ
  * @property {number|null} scrollAnimationFrame - スクロールアニメーションフレームID
  * @property {number|null} resizeTimeout - リサイズタイムアウトID
+ * @property {Function|null} markerResizeCallback - リサイズ時のミニマップマーカー再配置コールバック
  */
 
 /**
@@ -33,34 +33,18 @@
  * @property {HTMLElement} fixedHeader - 固定ヘッダー要素
  * @property {HTMLTableRowElement} fixedHeaderRow - 固定ヘッダー行要素
  * @property {HTMLElement} toolHeader - ツールヘッダー要素
- * @property {HTMLButtonElement} [markerModeToggle] - マーカーモード切替ボタン（オプション）
- */
-
-/**
- * @typedef {Object} DiffRowInfo
- * @property {HTMLTableRowElement} element - 差分行のDOM要素
- * @property {number} index - 差分インデックス
- * @property {string} textPreview - テキストプレビュー
- * @property {string} color - 背景色
  */
 
 /**
  * @typedef {Object} DiffBlock
  * @property {number} id - ブロックID
  * @property {'changed'|'word'|'del'|'moved_from'|'moved_to'|'separator'|'unknown'} type - 差分タイプ（CONFIG.DIFF_COLOR_MAP の type 値に対応）
- * @property {string} color - 背景色
+ * @property {string} color - 背景色（後方互換用・代表色）
+ * @property {string|null} leftColor - 旧ファイル側の背景色（ミニマップ左ペイン用）
+ * @property {string|null} rightColor - 新ファイル側の背景色（ミニマップ右ペイン用）
  * @property {number} startIndex - 開始行インデックス
  * @property {number} endIndex - 終了行インデックス
  * @property {HTMLTableRowElement[]} rows - 行要素の配列
- * @property {number} [top] - 上端位置（_placeBlockMarkers() 内の rAF で計算するため省略可）
- * @property {number} [height] - 高さ（同上）
- */
-
-/**
- * @typedef {Object} CachedMarkerData
- * @property {number|null} tableHash - テーブルのハッシュ値
- * @property {DiffRowInfo[]} diffRows - キャッシュされた差分行情報
- * @property {HTMLElement[]} markers - キャッシュされたマーカー要素
  */
 
 /**
@@ -76,10 +60,11 @@ const AppState = {
     /** @type {EventHandlers} イベントハンドラの管理 */
     eventHandlers: {
         keydown: null,
-        smoothUpdateViewport: null,
         debouncedResize: null,
         scrollAnimationFrame: null,
-        resizeTimeout: null
+        resizeTimeout: null,
+        /** @type {Function|null} リサイズ時のミニマップマーカー再配置コールバック */
+        markerResizeCallback: null,
     },
     
     /** @type {DOMElements|null} DOM要素への参照 */
@@ -91,24 +76,8 @@ const AppState = {
     /** @type {boolean} ファイル処理中フラグ */
     isProcessing: false,
     
-    /** @type {DiffRowInfo[]} 差分行情報の配列 */
-    diffRows: [],
-    
     /** @type {DiffBlock[]} 差分ブロック情報の配列 */
     diffBlocks: [],
-    
-    /** @type {boolean} ブロックモード使用フラグ */
-    useBlockMode: false,
-    
-    /** @type {CachedMarkerData} キャッシュされたマーカーデータ */
-    cachedMarkerData: {
-        tableHash: null,
-        diffRows: [],
-        markers: []
-    },
-    
-    /** @type {WeakMap<HTMLElement, Object>} マーカーイベントリスナーの管理 */
-    markerEventListeners: new WeakMap(),
     
     /** @type {number} 現在の差分インデックス */
     currentDiffIndex: -1,
@@ -137,6 +106,8 @@ const AppState = {
             viewer: document.getElementById('viewer'),
             diffContent: document.getElementById('diffContent'),
             locationPane: document.getElementById('locationPane'),
+            locationPaneLeft: document.getElementById('locationPaneLeft'),
+            locationPaneRight: document.getElementById('locationPaneRight'),
             dropArea: document.getElementById('dropArea'),
             resetButton: document.getElementById('resetButton'),
             scrollTopButton: document.getElementById('scrollTopButton'),
@@ -173,56 +144,19 @@ const AppState = {
         this.isProcessing = false;
         this.currentDiffIndex = -1;
         this.isNavigatingToDiff = false;
-        this.diffBlocks = [];
-        this.useBlockMode = false;
-        
-        // 差分行のクリーンアップ
-        if (Array.isArray(this.diffRows)) {
-            this.diffRows.forEach(row => {
-                if (row && typeof row === 'object') {
-                    if (row.element) row.element = null;
-                    Object.keys(row).forEach(key => { row[key] = null; });
+        // 差分ブロックのクリーンアップ（rows内の<tr>参照を解放してGCを促す）
+        if (Array.isArray(this.diffBlocks)) {
+            this.diffBlocks.forEach(block => {
+                if (block && typeof block === 'object') {
+                    if (Array.isArray(block.rows)) {
+                        block.rows.length = 0;
+                    }
+                    Object.keys(block).forEach(key => { block[key] = null; });
                 }
             });
-            this.diffRows.length = 0;
-            this.diffRows = [];
+            this.diffBlocks.length = 0;
         }
-
-        // キャッシュデータのクリーンアップ
-        if (this.cachedMarkerData) {
-            if (this.cachedMarkerData.markers && Array.isArray(this.cachedMarkerData.markers)) {
-                const lp = this.elements?.locationPane;
-                if (lp) {
-                    this.cachedMarkerData.markers.forEach(marker => {
-                        if (marker && marker.remove) {
-                            try {
-                                const listeners = this.markerEventListeners?.get(marker);
-                                if (listeners) {
-                                    marker.removeEventListener('click', listeners.click);
-                                    marker.removeEventListener('keydown', listeners.keydown);
-                                    this.markerEventListeners.delete(marker);
-                                }
-                                if (lp.contains(marker)) marker.remove();
-                            } catch (e) {
-                                Logger.warn('Marker removal failed:', e);
-                            }
-                        }
-                    });
-                }
-            }
-
-            if (this.cachedMarkerData.diffRows) {
-                this.cachedMarkerData.diffRows.forEach(row => {
-                    if (row && row.element) row.element = null;
-                });
-            }
-
-            this.cachedMarkerData = {
-                tableHash: null,
-                diffRows: [],
-                markers: []
-            };
-        }
+        this.diffBlocks = [];
 
         // IntersectionObserverのクリーンアップ
         if (this.intersectionObserver) {
@@ -243,12 +177,6 @@ const AppState = {
      */
     cleanupEventHandlers() {
         try {
-            // スクロールイベントハンドラの削除
-            if (this.eventHandlers.smoothUpdateViewport && this.elements?.diffContent) {
-                this.elements.diffContent.removeEventListener('scroll', this.eventHandlers.smoothUpdateViewport);
-                this.eventHandlers.smoothUpdateViewport = null;
-            }
-
             // アニメーションフレームのキャンセル
             if (this.eventHandlers.scrollAnimationFrame) {
                 cancelAnimationFrame(this.eventHandlers.scrollAnimationFrame);
@@ -271,6 +199,11 @@ const AppState = {
             if (this.eventHandlers.keydown) {
                 document.removeEventListener('keydown', this.eventHandlers.keydown);
                 this.eventHandlers.keydown = null;
+            }
+
+            // ミニマップマーカー再配置コールバックのクリア
+            if (this.eventHandlers.markerResizeCallback) {
+                this.eventHandlers.markerResizeCallback = null;
             }
 
             // IntersectionObserverの切断

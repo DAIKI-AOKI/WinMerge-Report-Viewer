@@ -1,118 +1,32 @@
 /**
  * Navigation - ナビゲーション制御モジュール（メモリリーク完全対策版）
- * 依存: config.js, state.js, utils.js, error-handler.js, ui.js, marker-manager.js, diff-detector.js
+ * 依存: config.js, state.js, utils.js, ui.js, html-processor.js, diff-detector.js
  * 
  * @fileoverview ナビゲーション機能とクリーンアップ処理
  */
 
 'use strict';
 import { CONFIG } from './config.js';
-import { NavigationError } from './errors.js';
 import { AppState, Logger } from './state.js';
 import { CSSManager } from './utils.js';
-import { ErrorHandler } from './error-handler.js';
 import { UI } from './ui.js';
 import { HTMLProcessor } from './html-processor.js';
-import { MarkerManager } from './marker-manager.js';
 import { BlockMarkerGenerator } from './diff-detector.js';
 
 const Navigation = (() => {
     /**
-     * 次の差分へジャンプ
-     * @returns {void}
-     */
-    function jumpToNextDiff() {
-        try {
-            if (AppState.diffRows.length === 0) {
-                throw new NavigationError('差分が見つかりません。');
-            }
-            clearCurrentDiffHighlight();
-            AppState.currentDiffIndex = (AppState.currentDiffIndex + 1) % AppState.diffRows.length;
-            jumpToDiff(AppState.currentDiffIndex);
-        } catch (error) {
-            ErrorHandler.handle(error, 'Next diff navigation');
-        }
-    }
-
-    /**
-     * 前の差分へジャンプ
-     * @returns {void}
-     */
-    function jumpToPrevDiff() {
-        try {
-            if (AppState.diffRows.length === 0) {
-                throw new NavigationError('差分が見つかりません。');
-            }
-            clearCurrentDiffHighlight();
-            AppState.currentDiffIndex = AppState.currentDiffIndex <= 0 
-                ? AppState.diffRows.length - 1 
-                : AppState.currentDiffIndex - 1;
-            jumpToDiff(AppState.currentDiffIndex);
-        } catch (error) {
-            ErrorHandler.handle(error, 'Previous diff navigation');
-        }
-    }
-
-    /**
-     * 指定インデックスの差分へジャンプ
-     * @param {number} index - 差分インデックス
-     * @returns {void}
-     * @throws {NavigationError} インデックスが無効な場合
-     */
-    function jumpToDiff(index) {
-        try {
-            if (index < 0 || index >= AppState.diffRows.length) {
-                throw new NavigationError(
-                    `無効な差分インデックス: ${index}`,
-                    index
-                );
-            }
-            
-            const diffRow = AppState.diffRows[index];
-            if (!diffRow || !diffRow.element) {
-                throw new NavigationError(
-                    `差分要素が見つかりません: インデックス ${index}`,
-                    index
-                );
-            }
-            
-            Logger.log('差分にジャンプ:', diffRow.textPreview);
-            AppState.isNavigatingToDiff = true;
-            diffRow.element.classList.add('current-diff');
-            diffRow.element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            
-            highlightSelectedMarker(index);
-            
-            setTimeout(() => {
-                AppState.isNavigatingToDiff = false;
-                Logger.log('差分ナビゲーション完了');
-            }, CONFIG.NAVIGATION_COMPLETE_DELAY);
-            
-            MarkerManager.updateDiffInfo();
-            
-        } catch (error) {
-            ErrorHandler.handle(error, 'Diff jump');
-        }
-    }
-
-    /**
      * 選択されたマーカーをハイライト
-     * @param {number} index - マーカーインデックス
+     * @param {number} index - ブロックインデックス
      * @returns {void}
      */
     function highlightSelectedMarker(index) {
         clearMarkerSelection();
         
-        let marker;
-        if (AppState.useBlockMode) {
-            marker = document.querySelector(`.block-marker[data-block-index="${index}"]`);
-        } else {
-            marker = document.querySelector(`.marker[data-index="${index}"]:not(.block-marker)`);
-        }
+        const markers = document.querySelectorAll(`.block-marker[data-block-index="${index}"]`);
+        markers.forEach(m => m.classList.add('marker-selected'));
         
-        if (marker) {
-            marker.classList.add('marker-selected');
-            Logger.log('マーカー選択:', index);
+        if (markers.length > 0) {
+            Logger.log('マーカー選択:', index, `(${markers.length}件)`);
         }
     }
 
@@ -155,51 +69,30 @@ const Navigation = (() => {
      * @returns {void}
      */
     function cleanupAllMarkers() {
-        const locationPane = AppState.elements.locationPane;
-        
-        if (!locationPane) {
-            Logger.warn('locationPane not found during cleanup');
-            return;
-        }
-        
+        const paneLeft  = AppState.elements.locationPaneLeft;
+        const paneRight = AppState.elements.locationPaneRight;
+
         Logger.log('=== すべてのマーカーをクリーンアップ開始 ===');
-        
-        // 各モジュールのイベントリスナーをクリーンアップ
-        if (typeof MarkerManager !== 'undefined' && MarkerManager.cleanupDelegation) {
-            MarkerManager.cleanupDelegation();
-            Logger.log('✅ MarkerManager のイベントリスナーを削除');
-        }
-        
-        if (typeof BlockMarkerGenerator !== 'undefined' && BlockMarkerGenerator.cleanupDelegation) {
-            BlockMarkerGenerator.cleanupDelegation();
-            Logger.log('✅ BlockMarkerGenerator のイベントリスナーを削除');
-        }
-        
-        // DOMからマーカーを削除する前に、個別のイベントリスナーもクリーンアップ
-        const allMarkers = locationPane.querySelectorAll('.marker');
-        Logger.log(`クリーンアップ対象のマーカー数: ${allMarkers.length}`);
-        
-        allMarkers.forEach(marker => {
-            try {
-                const listeners = AppState.markerEventListeners?.get(marker);
-                if (listeners) {
-                    if (listeners.click) {
-                        marker.removeEventListener('click', listeners.click);
-                    }
-                    if (listeners.keydown) {
-                        marker.removeEventListener('keydown', listeners.keydown);
-                    }
-                    AppState.markerEventListeners.delete(marker);
+
+        // イベント委譲リスナーを先に削除（ペイン要素ごと削除する前に必ず実行）
+        BlockMarkerGenerator.cleanupDelegation();
+        Logger.log('✅ BlockMarkerGenerator のイベントリスナーを削除');
+
+        // イベント委譲モデルのため、マーカー要素への個別リスナー登録は行っていない。
+        // DOM から remove() するだけでよい。
+        [paneLeft, paneRight].forEach(pane => {
+            if (!pane) return;
+            const allMarkers = pane.querySelectorAll('.marker');
+            Logger.log(`クリーンアップ対象のマーカー数: ${allMarkers.length} (${pane.id})`);
+            allMarkers.forEach(marker => {
+                try {
+                    marker.remove();
+                } catch (e) {
+                    Logger.warn('マーカー削除失敗:', e);
                 }
-                
-                marker.remove();
-            } catch (e) {
-                Logger.warn('マーカー削除失敗:', e);
-            }
+            });
         });
-        
-        AppState.markerEventListeners = new WeakMap();
-        
+
         Logger.log('=== すべてのマーカーのクリーンアップ完了 ===');
     }
 
@@ -232,47 +125,41 @@ const Navigation = (() => {
             }
             
             // ステップ7: コントロールボタンを非表示
-            // ★改善: UI_CONSTANTS.CONTROL_BUTTONS → CONFIG.CONTROL_BUTTONS
             CONFIG.CONTROL_BUTTONS.forEach(id => {
                 if (AppState.elements[id]) {
                     CSSManager.hideElement(AppState.elements[id], 'button-visible', 'button-hidden');
                 }
             });
             
-            // ステップ8: マーカーモード切替ボタンを非表示
-            if (Logger.enabled && typeof MarkerModeToggle !== 'undefined') {
-                MarkerModeToggle.hide();
-            }
-            
-            // ステップ9: 差分情報を非表示
+            // ステップ8: 差分情報を非表示
             if (AppState.elements.diffInfo) {
                 CSSManager.hideElement(AppState.elements.diffInfo, 'info-visible', 'info-hidden');
             }
             
-            // ステップ10: 固定ヘッダーを非表示
+            // ステップ9: 固定ヘッダーを非表示
             if (AppState.elements.fixedHeader) {
                 CSSManager.hideElement(AppState.elements.fixedHeader, 'fixed-header-visible', 'fixed-header-hidden');
             }
             
-            // ステップ11: ファイル入力をリセット
+            // ステップ10: ファイル入力をリセット
             if (AppState.elements.fileInput) {
                 AppState.elements.fileInput.value = '';
             }
             
-            // ステップ12: スクロール位置をリセット
+            // ステップ11: スクロール位置をリセット
             if (AppState.elements.diffContent) {
                 AppState.elements.diffContent.scrollTop = 0;
             }
             
-            // ステップ13: ハイライトをクリア
+            // ステップ12: ハイライトをクリア
             clearCurrentDiffHighlight();
             
-            // ステップ14: ブロックハイライトラッパーを削除
+            // ステップ13: ブロックハイライトラッパーを削除
             document.querySelectorAll('.block-highlight-wrapper').forEach(el => {
                 el.remove();
             });
             
-            // ステップ15: ツールヘッダーを表示
+            // ステップ14: ツールヘッダーを表示
             if (AppState.elements.toolHeader) {
                 CSSManager.showElement(AppState.elements.toolHeader, 'toolHeader-visible', 'toolHeader-hidden');
             }
@@ -284,13 +171,8 @@ const Navigation = (() => {
         }
     }
 
-
-
     // 公開API
     return {
-        jumpToNextDiff,
-        jumpToPrevDiff,
-        jumpToDiff,
         highlightSelectedMarker,
         clearMarkerSelection,
         clearCurrentDiffHighlight,

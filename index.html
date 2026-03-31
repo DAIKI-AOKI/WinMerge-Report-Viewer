@@ -40,10 +40,21 @@
         </p>
     </div>
 
-    <!-- 差分位置表示ペイン -->
-    <div id="locationPane" role="region" aria-label="差分位置表示ペイン" aria-describedby="locationPaneDesc">
+    <!-- 差分位置表示ペイン（左右2ミニマップ） -->
+    <div id="locationPane" role="region" aria-label="差分位置表示ペイン">
+        <div id="locationPaneLeft"
+             role="region"
+             aria-label="旧バージョン ミニマップ"
+             aria-describedby="locationPaneDesc">
+            <div class="minimap-header" aria-hidden="true">旧</div>
+        </div>
+        <div id="locationPaneRight"
+             role="region"
+             aria-label="新バージョン ミニマップ">
+            <div class="minimap-header" aria-hidden="true">新</div>
+        </div>
         <p id="locationPaneDesc" style="display:none;">
-            このペインには、ドキュメント内のすべての差分箇所が表示されます。マーカーをクリックすると、その差分へジャンプします。
+            左ペインは旧バージョン、右ペインは新バージョンの差分位置を示します。マーカーをクリックするとその差分へジャンプします。
         </p>
     </div>
 

@@ -204,12 +204,6 @@ const TableProcessor = (() => {
         }
     }
     
-    /**
-     * リサイズハンドラーをセットアップ
-     * @private
-     * @param {HTMLTableElement} table - 対象テーブル
-     * @returns {void}
-     */
     function setupResizeHandler(table) {
         if (!table) return;
         
@@ -241,11 +235,10 @@ const TableProcessor = (() => {
                     }
                 }
                 
-                // ★修正: ブロックハイライトも更新（ブロックモード時）
-                if (AppState.useBlockMode && typeof BlockMarkerGenerator !== 'undefined') {
-                    if (BlockMarkerGenerator.updateBlockHighlight) {
-                        BlockMarkerGenerator.updateBlockHighlight();
-                    }
+                // ブロックハイライト枠の位置・サイズを更新
+                // markerResizeCallback はブロックモード確立後に file-handler.js が登録する
+                if (typeof AppState.eventHandlers.markerResizeCallback === 'function') {
+                    AppState.eventHandlers.markerResizeCallback();
                 }
             }, CONFIG.RESIZE_DEBOUNCE_DELAY);
         };
@@ -255,78 +248,105 @@ const TableProcessor = (() => {
     }
 
     /**
-     * 行の背景色を取得（差分検出用）
+     * td 要素の背景色を取得する内部ユーティリティ。
+     * インラインスタイルの HEX（file:// 環境）と getComputedStyle の両方に対応。
+     * 中立色（白・薄グレー）は null を返す。
+     * @private
+     * @param {HTMLTableCellElement} td
+     * @returns {string|null} "rgb(r,g,b)" 形式 または null
+     */
+    function _getTdBgColor(td) {
+        function hexToRgb(hex) {
+            const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return r ? { r: parseInt(r[1],16), g: parseInt(r[2],16), b: parseInt(r[3],16) } : null;
+        }
+        function isNeutral(r, g, b) {
+            // 閾値 240: WinMerge の最も薄い差分色 rgb(241,226,173) の最小値が 173 であり、
+            // 白・薄グレー（r,g,b すべて 240 以上）とは十分に区別できる。
+            // ⚠️ CONFIG.DIFF_COLOR_MAP の色を変更する場合は、最も薄い色の最小チャンネル値が
+            //    240 を超えないことを確認すること。
+            return (r >= 240 && g >= 240 && b >= 240);
+        }
+        // ① インラインスタイルの HEX（file:// 環境対応）
+        const inline = td.style.backgroundColor;
+        if (inline && inline.startsWith('#')) {
+            const rgb = hexToRgb(inline);
+            if (rgb && !isNeutral(rgb.r, rgb.g, rgb.b)) return `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
+        }
+        // ② getComputedStyle
+        const bg = window.getComputedStyle(td).backgroundColor;
+        if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') {
+            const m = bg.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+            if (m) {
+                const r = parseInt(m[1]), g = parseInt(m[2]), b = parseInt(m[3]);
+                if (!isNeutral(r, g, b)) return bg;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 行の左列（旧ファイル）・右列（新ファイル）それぞれの背景色を返す。
      *
-     * 修正内容:
-     *   旧版は querySelectorAll('td, td *') で全子孫要素を走査し、
-     *   条件を満たす色をすべて上書きしていたため、行末の span（コメント等）の
-     *   色が最終結果として採用されるバグがあった。
-     *   新版は td 要素の背景色を優先して確認し、最初に見つかった時点で即リターン
-     *   することで、子要素の span による誤上書きを防ぐ。
-     *   また、file:// 環境で getComputedStyle が HEX 形式を返す場合に備え、
-     *   インラインスタイルの HEX 値も直接チェックする。
+     * WinMerge HTML レポートの tr 構造（バージョンによって異なる）:
+     *   パターンA: [td.title 行番号(旧)] [td 内容(旧)] [td.title 行番号(新)] [td 内容(新)] [td.added-right-bar]
+     *   パターンB: .title クラスなし、colspan を使う構造
      *
-     * @param {HTMLTableRowElement} row - 対象行
-     * @returns {string|null} 背景色（rgb形式）またはnull
+     * .title と .added-right-bar を除いた td が 4 つある場合は
+     *   index 0,1 = 旧ファイル側、index 2,3 = 新ファイル側
+     * 2 つの場合は index 0 = 旧、index 1 = 新
+     *
+     * さらに、テーブル全体の列数（ヘッダー行の th 数）を基準に
+     * left/right を判定することで .title クラス依存を排除する。
+     *
+     * @param {HTMLTableRowElement} row
+     * @returns {{ left: string|null, right: string|null }}
+     */
+    function getRowColors(row) {
+        // added-right-bar を除いた全 td を取得
+        const allTds = Array.from(row.querySelectorAll('td')).filter(
+            td => !td.classList.contains('added-right-bar')
+        );
+        const n = allTds.length;
+
+        if (n === 0) return { left: null, right: null };
+
+        // td が 1 本だけ（ヘッダー行・区切り行）の場合
+        if (n === 1) {
+            return { left: _getTdBgColor(allTds[0]), right: null };
+        }
+
+        // 左半分の中から有色 td を探す（旧ファイル側）
+        // Math.floor を使うことで奇数列の場合も左側が多くならず対称に近い分割になる
+        // n=4→half=2(2/2), n=3→half=1(1/2), n=5→half=2(2/3) ← 右に余分を渡す
+        const half = Math.floor(n / 2);
+        let leftColor = null;
+        for (let i = 0; i < half; i++) {
+            const c = _getTdBgColor(allTds[i]);
+            if (c) { leftColor = c; break; }
+        }
+
+        // 右半分の中から有色 td を探す（新ファイル側）
+        let rightColor = null;
+        for (let i = half; i < n; i++) {
+            const c = _getTdBgColor(allTds[i]);
+            if (c) { rightColor = c; break; }
+        }
+
+        return { left: leftColor, right: rightColor };
+    }
+
+    /**
+     * 行の背景色を取得（差分行の検出用・後方互換）。
+     * 左右どちらかに有色の td があればその色を返す。
+     * ミニマップ色には getRowColors() を使うこと。
+     *
+     * @param {HTMLTableRowElement} row
+     * @returns {string|null} "rgb(r,g,b)" または null
      */
     function getRowBackgroundColor(row) {
-        /**
-         * HEX カラーコードを RGB 文字列に変換
-         * @param {string} hex - "#efcb05" 形式
-         * @returns {{r:number, g:number, b:number}|null}
-         */
-        function hexToRgb(hex) {
-            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-            return result ? {
-                r: parseInt(result[1], 16),
-                g: parseInt(result[2], 16),
-                b: parseInt(result[3], 16)
-            } : null;
-        }
-
-        /**
-         * 中立色（白・薄グレー）かどうかを判定
-         * @param {number} r
-         * @param {number} g
-         * @param {number} b
-         * @returns {boolean}
-         */
-        function isNeutralColor(r, g, b) {
-            return (r === 255 && g === 255 && b === 255) || // 白
-                   (r >= 240 && g >= 240 && b >= 240) ||   // 薄グレー (#f0f0f0以上)
-                   (r >= 248 && g >= 248 && b >= 248);     // テーブル背景
-        }
-
-        // td 要素の背景色を優先して確認し、最初に見つかった時点で即リターン。
-        // これにより子要素 span（コメント等）による誤上書きを防ぐ。
-        for (const td of row.querySelectorAll('td')) {
-            if (td.classList.contains('added-right-bar')) continue;
-
-            // ① インラインスタイルの HEX を直接チェック（file:// 環境対応）
-            const inlineBg = td.style.backgroundColor;
-            if (inlineBg && inlineBg.startsWith('#')) {
-                const rgb = hexToRgb(inlineBg);
-                if (rgb && !isNeutralColor(rgb.r, rgb.g, rgb.b)) {
-                    return `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
-                }
-            }
-
-            // ② getComputedStyle による RGB 形式チェック（通常環境）
-            const bg = window.getComputedStyle(td).backgroundColor;
-            if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') {
-                const rgbMatch = bg.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-                if (rgbMatch) {
-                    const r = parseInt(rgbMatch[1]);
-                    const g = parseInt(rgbMatch[2]);
-                    const b = parseInt(rgbMatch[3]);
-                    if (!isNeutralColor(r, g, b)) {
-                        return bg;
-                    }
-                }
-            }
-        }
-
-        return null;
+        const { left, right } = getRowColors(row);
+        return left || right || null;
     }
 
     // 公開API
@@ -337,7 +357,8 @@ const TableProcessor = (() => {
         setupIntersectionObserver,
         setupResizeHandler,
         cleanupIntersectionObserver,
-        getRowBackgroundColor
+        getRowBackgroundColor,
+        getRowColors,
     };
 })();
 

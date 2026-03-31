@@ -17,20 +17,61 @@ body {
 }
 
 /* ========================================
-   位置表示ペイン（ミニマップ）
+   WinMerge デフォルト配色（ミニマップマーカー用）
+   ======================================== */
+:root {
+    --minimap-color-changed:  #FFD700; /* 差分行（変更） */
+    --minimap-color-word:     #FFD700; /* 行内差分（変更行扱い） */
+    --minimap-color-del:      #C0C0C0; /* 削除・追加行 */
+    --minimap-color-moved:    #FFA500; /* 移動ブロック */
+}
+
+/* ========================================
+   位置表示ペイン（左右2ミニマップ）
    ======================================== */
 #locationPane {
-    width: 50px;
+    display: flex;
+    flex-direction: row;
+    width: 60px;
+    flex-shrink: 0;
+    border-right: 1px solid #ccc;
     background: #f0f0f0;
+}
+
+#locationPaneLeft,
+#locationPaneRight {
+    flex: 1;
     position: relative;
+    overflow: hidden;
+    background: #f0f0f0;
+}
+
+#locationPaneLeft {
     border-right: 1px solid #ccc;
 }
 
-.marker {
+.minimap-header {
+    position: sticky;
+    top: 0;
     width: 100%;
+    height: 16px;
+    line-height: 16px;
+    text-align: center;
+    font-size: 9px;
+    font-weight: bold;
+    color: #666;
+    background: #e0e0e0;
+    border-bottom: 1px solid #ccc;
+    z-index: 10;
+    user-select: none;
+}
+
+.marker {
     position: absolute;
+    width: 100%;
     cursor: pointer;
     border-radius: 2px;
+    z-index: 2;
 }
 
 /* ブロックマーカー */
@@ -49,6 +90,14 @@ body {
     transform: translateX(-2px);
     box-shadow: -2px 0 8px rgba(0, 0, 0, 0.6);
     z-index: 15;
+}
+
+/* ホバー時: 左右ペインのマーカーをまとめてハイライト */
+.block-marker-hover {
+    transform: translateX(-2px);
+    box-shadow: -2px 0 6px rgba(0, 0, 0, 0.35);
+    z-index: 14;
+    filter: brightness(1.15);
 }
 
 .block-marker-label {
@@ -321,21 +370,6 @@ table.diff td {
 
 #resetButton {
     right: 390px;
-}
-
-#markerModeToggle {
-    right: 515px;   /* ④ event-manager.js の style.right='515px' をCSS側に移動 */
-    min-width: 130px;
-}
-
-/* ④ モード別の背景色（JS の style.background 直接操作を廃止しCSSで管理）
-   event-manager.js の _updateToggleButton() が classList.toggle() でこれを切り替える */
-#markerModeToggle.mode-block {
-    background: linear-gradient(#ff6b6b, #c92a2a);
-}
-
-#markerModeToggle.mode-line {
-    background: linear-gradient(mediumblue, darkblue);
 }
 
 #diffInfo {

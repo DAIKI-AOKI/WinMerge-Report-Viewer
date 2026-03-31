@@ -24,7 +24,6 @@ const CONFIG = {
     // HTML処理
     // ========================================
     ALLOWED_TAGS: ['table', 'tr', 'td', 'th', 'span', 'div', 'style'],
-    FORBID_ATTR: ['onclick', 'onload', 'onerror', 'onfocus', 'onmouseover'],
     
     // ========================================
     // 差分表示
@@ -37,8 +36,9 @@ const CONFIG = {
      * WinMerge 内部は BGR 形式で保持していますが、HTML レポート出力時に
      * RGB に変換されるため、ここでは RGB 形式で定義しています。
      *
-     * ⑥ 将来の動的設定UI向け: loadUserColorConfig() が
-     *    localStorage の値でこの配列を上書きします（config.js 末尾参照）。
+     * ⚠️ table-processor.js の isNeutral() の閾値（240）は、
+     *    ここで定義する最も薄い差分色（現在: word の 173）を前提にしています。
+     *    色を変更する場合は最小チャンネル値が 240 を超えないことを確認してください。
      */
     DIFF_COLOR_MAP: [
         { color: 'rgb(239, 203, 5)',   type: 'changed',    label: '変更行' },        // #efcb05
@@ -49,8 +49,6 @@ const CONFIG = {
         { color: 'rgb(192, 192, 192)', type: 'separator',  label: '区切り行' },       // #c0c0c0
     ],
 
-    // 後方互換のため残すが DIFF_COLOR_MAP を優先すること
-    DIFF_COLORS: ['rgb(239, 203, 5)', 'rgb(255, 160, 160)'],
     
     // ========================================
     // UI関連
@@ -59,7 +57,6 @@ const CONFIG = {
     MIN_COLUMN_WIDTH: 300,  // カラムの最小幅（px）
     HEADER_ADJUSTMENT: 17.5,  // ヘッダー幅の調整値（px）
     HEADER_VISIBILITY_THRESHOLD: 2,  // ヘッダー表示の閾値（px）
-    MIN_MARKER_HEIGHT: 2,  // マーカーの最小高さ（px）
     
     // ★統合: UI_CONSTANTS から移動
     CONTROL_BUTTONS: ['resetButton', 'scrollTopButton', 'prevDiffButton', 'nextDiffButton'],
@@ -67,7 +64,6 @@ const CONFIG = {
     // ========================================
     // タイミング・遅延（ミリ秒）
     // ========================================
-    RENDER_DELAY: 100,  // レンダリング遅延
     RESIZE_DEBOUNCE_DELAY: 150,  // リサイズデバウンス遅延
     NAVIGATION_COMPLETE_DELAY: 1000,  // ナビゲーション完了待機時間
     
@@ -91,6 +87,8 @@ const CONFIG = {
 
     // ミニマップマーカーの統一色
     // 位置把握が目的のため色分けは行わず1色で統一する
+    // ⚠️ 現在は marker-manager.js（孤立ファイル）からのみ参照。
+    //    marker-manager.js を削除する際はこの定数も合わせて削除すること。
     MARKER_COLOR: '#F2D74E',
     
     // ========================================
@@ -98,6 +96,8 @@ const CONFIG = {
     // ========================================
     BLOCK_LABEL_DISPLAY_THRESHOLD: 20,  // この数以下の場合、ブロック番号ラベルを表示
     MARKER_MIN_HEIGHT_PERCENT: 0.5,  // マーカーの最小高さ（%）
+    // ⚠️ 現在は marker-manager.js（孤立ファイル）からのみ参照。
+    //    marker-manager.js を削除する際はこの定数と下記説明コメントも合わせて削除すること。
     TEXT_PREVIEW_MAX_LENGTH: 100,  // テキストプレビューの最大文字数
     
     // ========================================
@@ -114,6 +114,7 @@ const CONFIG = {
     // TEXT_PREVIEW_MAX_LENGTH:
     //   差分行のテキストプレビュー（ツールチップやログ用）の最大文字数です。
     //   長すぎるテキストは切り詰められます。
+    //   ⚠️ marker-manager.js（孤立ファイル）削除時に合わせて削除すること。
 };
 
 /**
@@ -122,46 +123,5 @@ const CONFIG = {
 const DRAG_EVENTS = ['dragenter', 'dragover', 'dragleave', 'drop'];
 const HIGHLIGHT_EVENTS = ['dragenter', 'dragover'];
 const UNHIGHLIGHT_EVENTS = ['dragleave', 'drop'];
-
-// ========================================
-// ⑥ 差分色の動的設定 UI — 準備コード
-// ========================================
-// 将来の設定画面実装時に活用してください。
-// 現在はコメントアウト状態です。有効化しても他のコードに影響はありません。
-//
-// /**
-//  * ユーザーが保存した差分色設定を LocalStorage から読み込み、
-//  * CONFIG.DIFF_COLOR_MAP を上書きします。
-//  * アプリ起動時（main.js の init() の先頭）で呼び出してください。
-//  */
-// function loadUserColorConfig() {
-//     try {
-//         const saved = localStorage.getItem('winmerge_diffColors');
-//         if (saved) {
-//             const parsed = JSON.parse(saved);
-//             // 最低限のバリデーション
-//             if (Array.isArray(parsed) && parsed.every(e => e.color && e.type)) {
-//                 CONFIG.DIFF_COLOR_MAP = parsed;
-//             }
-//         }
-//     } catch (e) {
-//         console.warn('[WinMergeViewer] 差分色設定の読み込みに失敗しました:', e);
-//     }
-// }
-//
-// /**
-//  * ユーザーが選択した差分色を LocalStorage に保存し、即時反映します。
-//  * 設定画面の「保存」ボタンから呼び出してください。
-//  * @param {string} addColor - 追加行の色 (例: 'rgb(204, 255, 204)')
-//  * @param {string} delColor - 削除行の色 (例: 'rgb(255, 204, 204)')
-//  */
-// function saveUserColorConfig(addColor, delColor) {
-//     const config = [
-//         { color: addColor, type: 'add' },
-//         { color: delColor, type: 'del' },
-//     ];
-//     localStorage.setItem('winmerge_diffColors', JSON.stringify(config));
-//     CONFIG.DIFF_COLOR_MAP = config;  // 即時反映
-// }
 
 export { CONFIG, DRAG_EVENTS, HIGHLIGHT_EVENTS, UNHIGHLIGHT_EVENTS };

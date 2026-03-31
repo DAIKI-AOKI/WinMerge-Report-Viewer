@@ -1,185 +1,75 @@
-# WinMerge Report Viewer
+# WinMerge Report Viewer v2
 
-WinMerge が出力した HTML レポートをブラウザで見やすく表示するウェブアプリです。
+WinMerge が出力した HTML 差分レポートを、より快適にレビューするためのビューアです。
 
-🌐 **公開URL**: https://daiki-aoki.github.io/WinMerge-Report-Viewer/
+## 主な機能
 
----
-
-## このアプリでできること
-
-- WinMerge の HTMLレポートファイル（`.htm` / `.html`）をブラウザで開く
-- 差分箇所をハイライト表示する
-- 「次の差分」「前の差分」ボタンで差分行を順番に確認できる
-- ミニマップ（右端のバー）で差分の位置を一目で把握できる
-- ミニマップをクリックして差分箇所にジャンプできる
-
----
+- ドラッグ&ドロップでの HTM/HTML ファイル読み込み
+- 差分ブロックのミニマップ（左右2ペイン・旧/新ファイル別色表示）
+- 差分ブロックへのキーボード/ボタンナビゲーション
+- 固定ヘッダー（スクロール時にカラム名を常時表示）
+- Shift-JIS / UTF-8 自動判別
+- ファイル処理中のプログレスインジケーター
 
 ## 使い方
 
-1. ブラウザで公開URLにアクセスする
-2. WinMerge で出力した `.htm` ファイルをドラッグ＆ドロップする（またはクリックしてファイルを選択する）
-3. 差分テーブルが表示される
-4. 「次の差分 →」「← 前の差分」ボタンで差分を確認する
-5. 「↺ リセット」ボタンで別のファイルを読み込める
+1. `index.html` をブラウザで開く（`file://` または任意の HTTP サーバー）
+2. WinMerge で生成した `.htm` / `.html` レポートをドラッグ&ドロップ、またはボタンで選択
 
----
+> **制約**: 最大ファイルサイズ 10 MB。スマートフォン非対応。
 
-## アーキテクチャ概要
-
-### データの流れ
+## ファイル構成
 
 ```
-HTMファイル選択
-    ↓
-file-handler.js   ← ファイルを読み込み・検証する
-    ↓
-html-processor.js ← HTMLをサニタイズ（XSS対策）する
-    ↓
-table-processor.js ← 差分テーブルを解析・整形する
-    ↓
-marker-manager.js  ← ミニマップのマーカーを生成する
-diff-detector.js   ← ブロック単位の差分を検出する
-    ↓
-navigation.js      ← 差分ナビゲーション（次へ・前へ）を制御する
-    ↓
-ブラウザに表示
+├── index.html
+├── style.css
+├── js/
+│   ├── main.js              # エントリーポイント・初期化
+│   ├── config.js            # 設定定数
+│   ├── state.js             # アプリケーション状態管理
+│   ├── errors.js            # カスタムエラークラス
+│   ├── error-handler.js     # エラーハンドリング
+│   ├── event-manager.js     # イベントリスナー管理
+│   ├── file-handler.js      # ファイル読み込み・処理オーケストレーター
+│   ├── html-processor.js    # HTML サニタイズ・スタイルインポート
+│   ├── table-processor.js   # 差分テーブル処理・固定ヘッダー
+│   ├── diff-detector.js     # 差分ブロック検出・ミニマップマーカー生成
+│   ├── navigation.js        # 差分ナビゲーション・リセット
+│   ├── progress-indicator.js# プログレス表示
+│   ├── ui.js                # UI 表示制御
+│   └── utils.js             # 汎用ユーティリティ
+└── _legacy/
+    └── marker-manager.js    # 旧・行単位マーカー（使用停止・参照禁止）
 ```
 
-### モジュール構成
-
-| ファイル | 役割 | 難易度 |
-|---|---|---|
-| `config.js` | 色・サイズなどの定数を一元管理 | ★☆☆ |
-| `state.js` | アプリ全体の状態（現在の差分位置など）を管理 | ★★☆ |
-| `errors.js` | エラーの種類を定義 | ★☆☆ |
-| `error-handler.js` | エラー発生時の処理を担当 | ★★☆ |
-| `file-handler.js` | ファイルの読み込みと検証を担当 | ★★☆ |
-| `html-processor.js` | HTMLのサニタイズ（安全処理）を担当 | ★★☆ |
-| `table-processor.js` | 差分テーブルの解析・固定ヘッダー処理を担当 | ★★☆ |
-| `marker-manager.js` | ミニマップのラインマーカーを管理 | ★★★ |
-| `diff-detector.js` | ブロック単位の差分検出とブロックマーカーを管理 | ★★★ |
-| `navigation.js` | 差分ナビゲーション全体を制御 | ★★★ |
-| `event-manager.js` | ドラッグ＆ドロップ・ボタンのイベントを管理 | ★★☆ |
-| `ui.js` | 画面表示の切り替えを担当 | ★☆☆ |
-| `utils.js` | 共通ユーティリティ関数 | ★☆☆ |
-| `main.js` | アプリの起動・全モジュールの統合 | ★★☆ |
-
----
-
-## 設計上の判断
-
-### なぜ Vanilla JS（フレームワークなし）を選んだか
-React や Vue などのフレームワークを使わず、素の JavaScript で実装しています。WinMerge レポートの表示という単一目的のツールであり、外部依存を最小化してどこでも動作させることを優先しました。GitHub Pages でそのまま配信できるのもこのためです。
-
-### なぜ ESM（モジュール形式）を採用したか
-コードを機能ごとにファイルに分割し、それぞれが独立して動作するよう ESM（`import` / `export`）形式を採用しています。テストを書きやすくするという目的もあります。
-
-### セキュリティ対策（XSS）
-読み込んだ HTML ファイルをそのままブラウザに表示すると、悪意あるスクリプトが実行される危険があります（XSS攻撃）。`html-processor.js` がファイル読み込み直後に `<script>` タグや `onclick` などの危険な属性を除去します。
-
-### メモリリーク対策
-イベントリスナーを登録したら、不要になったタイミングで必ず削除するよう設計しています（`cleanup()` パターン）。特にファイルを読み直すたびに古いリスナーが残らないよう注意して実装されています。
-
----
-
-## テスト
-
-### テスト構成
-
-```
-tests/
-├── config.test.js              # 定数の検証
-├── errors.test.js              # エラークラスの検証
-├── utils.test.js               # ユーティリティ関数の検証
-├── state.test.js               # 状態管理の検証
-├── error-handler.test.js       # エラーハンドリングの検証
-├── file-handler.test.js        # ファイル読み込みの検証
-├── html-processor.test.js      # HTMLサニタイズの検証
-├── table-processor.test.js     # テーブル解析の検証
-├── table-processor-extra.test.js
-├── marker-manager.test.js      # マーカー管理の検証
-├── diff-detector.test.js       # 差分検出の検証
-├── diff-detector-extra.test.js
-├── navigation.test.js          # ナビゲーションの検証
-├── navigation-extra.test.js
-├── block-marker-generator.test.js
-├── event-manager.test.js       # イベント管理の検証
-└── e2e/
-    └── viewer.spec.js          # ブラウザ上での動作確認（E2Eテスト）
-```
-
-### テスト実績
-
-| 項目 | 数値 |
-|---|---|
-| ユニットテスト | 286件 PASS |
-| E2Eテスト | 20件 PASS |
-| カバレッジ（全体） | 87.12% |
-
-### テスト実行方法
-
-```bash
-# 依存パッケージのインストール
-npm install
-
-# ユニットテストを実行
-npm test
-
-# カバレッジレポートを生成
-npx vitest run --coverage
-
-# E2Eテストを実行（Live Serverが起動している状態で）
-npx playwright test
-```
-
----
-
-## CI/CD
-
-GitHub Actions でプッシュのたびに自動でテストが実行されます。
-
-| ジョブ | 内容 |
-|---|---|
-| ユニットテスト | Vitest で286件のテストを実行・カバレッジレポートを生成 |
-| E2Eテスト | Playwright でブラウザ上の動作を確認 |
-
-カバレッジレポートは GitHub Actions の **Artifacts** からダウンロードできます。
-
----
-
-## ローカル開発環境のセットアップ
-
-```bash
-# リポジトリをクローン
-git clone https://github.com/DAIKI-AOKI/WinMerge-Report-Viewer.git
-cd WinMerge-Report-Viewer
-
-# 依存パッケージをインストール
-npm install
-
-# Live Server（VSCode拡張）でindex.htmlを開く
-# または以下のコマンドで簡易サーバーを起動
-npx serve . -p 5500
-```
-
----
-
-## 今後の予定
-
-- [ ] 差分色カスタマイズ設定画面
-- [ ] ロケーションペインを左右2つのミニマップに変更（WinMergeアプリと同様）
-
----
-
-## 技術スタック
+## 前バージョン（v1）との主な差分
 
 | 項目 | 内容 |
 |---|---|
-| 言語 | JavaScript（Vanilla JS / ESM形式） |
-| テスト（ユニット） | Vitest |
-| テスト（E2E） | Playwright |
-| CI/CD | GitHub Actions |
-| ホスティング | GitHub Pages |
-| 対応ブラウザ | Chrome / Edge（最新版） |
+| バグ修正 | `TableProcessingError` の二重ラップを解消 |
+| バグ修正 | `currentDiffIndex` の二重代入を解消（`jumpToBlock` に一元化） |
+| 設計改善 | `_Navigation` / `setNavigation` を `BlockMarkerGenerator` スコープ内に移動 |
+| 設計改善 | 使用停止済みの `WeakMap`（`markerEventListeners`）を全モジュールから削除 |
+| 設計改善 | `isNeutral()` の重複条件を削除・閾値の根拠をコメントに明記 |
+| 整理 | `computeTableHash` の FNV-1a 説明を JSDoc に統合 |
+| 整理 | `config.js` のコメントアウトコード（`loadUserColorConfig` 等）を削除 |
+| 整理 | `main.js` の不要な `typeof` ガードを削除 |
+| 整理 | `progress-indicator.js` の `hideTimeout` / `fallbackTimeout` を分離 |
+| 隔離 | `marker-manager.js` を `_legacy/` に移動 |
+
+## 開発・デバッグ
+
+URL に `?debug=true` を付けるか、`localhost` / `127.0.0.1` で開くとデバッグモードが有効になります。
+
+```
+# ブラウザコンソールで使用可能なデバッグ関数
+wmv.debug.showBlocks()      # 差分ブロック統計・一覧
+wmv.debug.visualizeBlocks() # ブロックを色枠で視覚化
+wmv.debug.memoryStatus()    # メモリ使用量
+wmv.debug.appState()        # AppState の状態
+wmv.debug.all()             # 上記すべて
+```
+
+## ライセンス
+
+MIT

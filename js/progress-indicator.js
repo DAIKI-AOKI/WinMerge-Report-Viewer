@@ -1,5 +1,5 @@
 /**
- * js/progress-indicator.js - プログレスインジケーター（メモリリーク対策版）
+ * js/progress-indicator.js - プログレスインジケーター
  * 
  * 依存関係: なし（独立したモジュール）
  * 
@@ -37,8 +37,11 @@ class ProgressIndicator {
         /** @type {HTMLElement|null} パーセンテージテキスト要素 */
         this.percentText = null;
         
-        /** @type {number|null} hide() のタイムアウトID */
+        /** @type {number|null} hide() の遅延タイムアウトID（フェードアウト開始まで） */
         this.hideTimeout = null;
+        
+        /** @type {number|null} transitionend 未発火時のフォールバックタイムアウトID */
+        this.fallbackTimeout = null;
         
         /** @type {Function|null} transitionend イベントハンドラの参照 */
         this.transitionEndHandler = null;
@@ -96,7 +99,7 @@ class ProgressIndicator {
      * @returns {void}
      */
     show(title = '処理中...') {
-        // ★メモリリーク対策1: 既存のタイムアウトをクリア
+        // 再表示時に前回の hide() タイムアウトが残っていればキャンセル
         this.clearTimeouts();
         
         if (!this.overlay) {
@@ -171,14 +174,13 @@ class ProgressIndicator {
     }
 
     /**
-     * プログレスインジケーターを非表示（メモリリーク対策強化版）
+     * プログレスインジケーターを非表示
      * @param {number} [delay=300] - フェードアウト前の遅延時間（ミリ秒）
      * @returns {void}
      */
     hide(delay = 300) {
         if (!this.overlay) return;
         
-        // ★メモリリーク対策2: 既存のタイムアウトをクリア
         this.clearTimeouts();
         
         this.hideTimeout = setTimeout(() => {
@@ -186,29 +188,24 @@ class ProgressIndicator {
             
             this.overlay.classList.remove('active');
             
-            // ★メモリリーク対策3: transitionend イベントで確実にクリーンアップ
             this.transitionEndHandler = () => {
                 if (this.overlay) {
-                    // ★重要: イベントリスナーを削除
                     if (this.transitionEndHandler) {
                         this.overlay.removeEventListener('transitionend', this.transitionEndHandler);
                         this.transitionEndHandler = null;
                     }
-                    
-                    // DOMから削除
                     if (this.overlay.parentNode) {
                         this.overlay.parentNode.removeChild(this.overlay);
                     }
-                    
-                    // 参照をクリア
                     this.cleanup();
                 }
             };
             
             this.overlay.addEventListener('transitionend', this.transitionEndHandler);
             
-            // ★メモリリーク対策4: フォールバック（transitionend が発火しない場合）
-            this.hideTimeout = setTimeout(() => {
+            // transitionend が発火しない場合（アニメーション無効環境など）のフォールバック。
+            // hideTimeout とは別変数で管理することで clearTimeouts() が両方を確実にキャンセルできる。
+            this.fallbackTimeout = setTimeout(() => {
                 if (this.transitionEndHandler) {
                     this.transitionEndHandler();
                 }
@@ -245,23 +242,27 @@ class ProgressIndicator {
             clearTimeout(this.hideTimeout);
             this.hideTimeout = null;
         }
+        if (this.fallbackTimeout) {
+            clearTimeout(this.fallbackTimeout);
+            this.fallbackTimeout = null;
+        }
     }
 
     /**
-     * リソースをクリーンアップ（メモリリーク対策強化版）
+     * リソースをクリーンアップ
      * @returns {void}
      */
     cleanup() {
-        // ★メモリリーク対策5: すべてのタイムアウトをクリア
+        // hideTimeout と fallbackTimeout を両方クリア
         this.clearTimeouts();
         
-        // ★メモリリーク対策6: イベントリスナーを削除
+        // transitionend リスナーを削除
         if (this.overlay && this.transitionEndHandler) {
             this.overlay.removeEventListener('transitionend', this.transitionEndHandler);
             this.transitionEndHandler = null;
         }
         
-        // ★メモリリーク対策7: すべての参照をクリア
+        // すべての DOM 参照をクリア
         this.overlay = null;
         this.progressBar = null;
         this.statusText = null;
