@@ -7,28 +7,34 @@
  *   - cleanupTimers() でタイマーが解放されるか
  *   - cleanupEventHandlers() でハンドラが解放されるか
  *   - Logger の enabled 判定が正しいか
+ *
+ * v2 変更点:
+ *   - AppState.diffRows        → 削除（行単位マーカー廃止）
+ *   - AppState.useBlockMode    → 削除（常にブロックモード）
+ *   - AppState.cachedMarkerData → 削除（行単位マーカー廃止）
+ *   - locationPane → locationPaneLeft / locationPaneRight の2ペイン構造
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ========================================
 // テスト用 HTML fixture
-// AppState.init() が document.getElementById を呼ぶため
-// jsdom 上に必要な要素を用意する
 // ========================================
 function setupDOM() {
     document.body.innerHTML = `
         <input id="fileInput" />
         <div id="viewer"></div>
         <div id="diffContent"></div>
-        <div id="locationPane"></div>
+        <div id="locationPane">
+            <div id="locationPaneLeft"></div>
+            <div id="locationPaneRight"></div>
+        </div>
         <div id="dropArea"></div>
         <button id="resetButton"></button>
         <button id="scrollTopButton"></button>
         <button id="prevDiffButton"></button>
         <button id="nextDiffButton"></button>
         <div id="diffInfo"></div>
-        <div id="fixedHeader"></div>
         <div id="fixedHeader">
             <table><tr id="fixedHeaderRow"></tr></table>
         </div>
@@ -48,24 +54,9 @@ describe('AppState - 初期値', () => {
         expect(AppState.currentDiffIndex).toBe(-1);
     });
 
-    it('diffRows の初期値が空配列である', () => {
-        expect(Array.isArray(AppState.diffRows)).toBe(true);
-        expect(AppState.diffRows).toHaveLength(0);
-    });
-
     it('diffBlocks の初期値が空配列である', () => {
         expect(Array.isArray(AppState.diffBlocks)).toBe(true);
         expect(AppState.diffBlocks).toHaveLength(0);
-    });
-
-    it('useBlockMode の初期値が false である', () => {
-        expect(AppState.useBlockMode).toBe(false);
-    });
-
-    it('cachedMarkerData の初期値が正しい構造を持つ', () => {
-        expect(AppState.cachedMarkerData.tableHash).toBeNull();
-        expect(AppState.cachedMarkerData.diffRows).toHaveLength(0);
-        expect(AppState.cachedMarkerData.markers).toHaveLength(0);
     });
 
     it('isNavigatingToDiff の初期値が false である', () => {
@@ -92,7 +83,8 @@ describe('AppState.init()', () => {
 
     it('主要な DOM 要素がすべて取得できる', () => {
         const keys = [
-            'fileInput', 'viewer', 'diffContent', 'locationPane',
+            'fileInput', 'viewer', 'diffContent',
+            'locationPane', 'locationPaneLeft', 'locationPaneRight',
             'dropArea', 'resetButton', 'scrollTopButton',
             'prevDiffButton', 'nextDiffButton', 'diffInfo',
             'fixedHeader', 'fixedHeaderRow', 'toolHeader'
@@ -114,9 +106,7 @@ describe('AppState.reset()', () => {
         AppState.isProcessing = true;
         AppState.currentDiffIndex = 5;
         AppState.isNavigatingToDiff = true;
-        AppState.useBlockMode = true;
         AppState.diffBlocks = [{ id: 0 }];
-        AppState.diffRows = [{ element: document.createElement('tr'), index: 0 }];
     });
 
     it('isProcessing が false にリセットされる', () => {
@@ -134,27 +124,9 @@ describe('AppState.reset()', () => {
         expect(AppState.isNavigatingToDiff).toBe(false);
     });
 
-    it('useBlockMode が false にリセットされる', () => {
-        AppState.reset();
-        expect(AppState.useBlockMode).toBe(false);
-    });
-
     it('diffBlocks が空配列にリセットされる', () => {
         AppState.reset();
         expect(AppState.diffBlocks).toHaveLength(0);
-    });
-
-    it('diffRows が空配列にリセットされる', () => {
-        AppState.reset();
-        expect(AppState.diffRows).toHaveLength(0);
-    });
-
-    it('cachedMarkerData が初期状態にリセットされる', () => {
-        AppState.cachedMarkerData = { tableHash: 123, diffRows: [{}], markers: [{}] };
-        AppState.reset();
-        expect(AppState.cachedMarkerData.tableHash).toBeNull();
-        expect(AppState.cachedMarkerData.diffRows).toHaveLength(0);
-        expect(AppState.cachedMarkerData.markers).toHaveLength(0);
     });
 
     it('IntersectionObserver が disconnect される', () => {
