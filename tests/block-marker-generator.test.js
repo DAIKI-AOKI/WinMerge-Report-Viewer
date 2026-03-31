@@ -10,7 +10,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // ========================================
 function setupDOM() {
     document.body.innerHTML = `
-        <div id="locationPane"></div>
+        <div id="locationPane">
+            <div id="locationPaneLeft"></div>
+            <div id="locationPaneRight"></div>
+        </div>
         <div id="diffContent">
             <div id="diffInfo"></div>
             <div id="viewer"></div>
@@ -107,17 +110,17 @@ describe('BlockMarkerGenerator.updateBlockInfo()', () => {
 // clearBlockMarkers()
 // ========================================
 describe('BlockMarkerGenerator.clearBlockMarkers()', () => {
-    it('block-marker クラスの要素が locationPane から削除される', () => {
-        const locationPane = AppState.elements.locationPane;
+    it('block-marker クラスの要素が locationPaneLeft から削除される', () => {
+        const paneLeft = AppState.elements.locationPaneLeft;
         const m1 = document.createElement('div');
         m1.classList.add('block-marker');
         const m2 = document.createElement('div');
         m2.classList.add('block-marker');
-        locationPane.appendChild(m1);
-        locationPane.appendChild(m2);
-        expect(locationPane.querySelectorAll('.block-marker').length).toBe(2);
+        paneLeft.appendChild(m1);
+        paneLeft.appendChild(m2);
+        expect(paneLeft.querySelectorAll('.block-marker').length).toBe(2);
         BlockMarkerGenerator.clearBlockMarkers();
-        expect(locationPane.querySelectorAll('.block-marker').length).toBe(0);
+        expect(paneLeft.querySelectorAll('.block-marker').length).toBe(0);
     });
 
     it('block-marker がない場合でも例外が発生しない', () => {
@@ -129,10 +132,10 @@ describe('BlockMarkerGenerator.clearBlockMarkers()', () => {
 // generateBlockMarkers()
 // ========================================
 describe('BlockMarkerGenerator.generateBlockMarkers()', () => {
-    it('blocks が空のとき locationPane にマーカーが追加されない', () => {
+    it('blocks が空のとき locationPaneLeft にマーカーが追加されない', () => {
         const table = makeTable();
         BlockMarkerGenerator.generateBlockMarkers([], table);
-        const markers = AppState.elements.locationPane.querySelectorAll('.block-marker');
+        const markers = AppState.elements.locationPaneLeft.querySelectorAll('.block-marker');
         expect(markers.length).toBe(0);
     });
 
@@ -196,12 +199,12 @@ describe('BlockMarkerGenerator.jumpToBlock()', () => {
 // cleanup()
 // ========================================
 describe('BlockMarkerGenerator.cleanup()', () => {
-    it('locationPane 内の block-marker が削除される', () => {
-        const locationPane = AppState.elements.locationPane;
+    it('locationPaneLeft 内の block-marker が削除される', () => {
+        const paneLeft = AppState.elements.locationPaneLeft;
         const marker = document.createElement('div');
         marker.classList.add('block-marker');
-        locationPane.appendChild(marker);
+        paneLeft.appendChild(marker);
         BlockMarkerGenerator.cleanup();
-        expect(locationPane.querySelectorAll('.block-marker').length).toBe(0);
+        expect(paneLeft.querySelectorAll('.block-marker').length).toBe(0);
     });
 });

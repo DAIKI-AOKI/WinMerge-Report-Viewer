@@ -2,7 +2,6 @@
  * diff-detector.js 追加テスト
  * cleanupDelegation / updateBlockHighlight をカバー
  */
-
 import { BlockMarkerGenerator } from '../js/diff-detector.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
@@ -12,7 +11,10 @@ afterEach(() => {
 
 function setupDOM() {
     document.body.innerHTML = `
-        <div id="locationPane"></div>
+        <div id="locationPane">
+            <div id="locationPaneLeft"></div>
+            <div id="locationPaneRight"></div>
+        </div>
         <div id="diffContent">
             <div id="diffInfo" class="info-hidden"></div>
             <div id="viewer"></div>
@@ -37,8 +39,10 @@ function makeBlock(id = 0, rowCount = 2) {
         tr.scrollIntoView = vi.fn();
         return tr;
     });
-    return { id, type: 'changed', color: 'rgb(239, 203, 5)',
-             startIndex: id * rowCount, endIndex: id * rowCount + rowCount - 1, rows };
+    return {
+        id, type: 'changed', color: 'rgb(239, 203, 5)',
+        startIndex: id * rowCount, endIndex: id * rowCount + rowCount - 1, rows
+    };
 }
 
 beforeEach(() => {
@@ -89,13 +93,11 @@ describe('BlockMarkerGenerator.updateBlockHighlight()', () => {
 // ========================================
 describe('BlockMarkerGenerator.cleanup() - 追加', () => {
     it('locationPane 内の block-marker が削除される', () => {
-        const locationPane = AppState.elements.locationPane;
+        const paneLeft = AppState.elements.locationPaneLeft;
         const marker = document.createElement('div');
         marker.classList.add('block-marker');
-        locationPane.appendChild(marker);
-
+        paneLeft.appendChild(marker);
         BlockMarkerGenerator.cleanup();
-
-        expect(locationPane.querySelectorAll('.block-marker').length).toBe(0);
+        expect(paneLeft.querySelectorAll('.block-marker').length).toBe(0);
     });
 });
