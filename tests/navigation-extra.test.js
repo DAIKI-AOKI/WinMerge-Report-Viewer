@@ -1,6 +1,9 @@
 /**
  * navigation.js 追加テスト
  * cleanupAllMarkers / resetInterface をカバー
+ *
+ * v2 変更点:
+ *   - locationPane → locationPaneLeft / locationPaneRight の2ペイン構造
  */
 
 import { Navigation } from '../js/navigation.js';
@@ -14,7 +17,10 @@ afterEach(() => {
 
 function setupDOM() {
     document.body.innerHTML = `
-        <div id="locationPane"></div>
+        <div id="locationPane">
+            <div id="locationPaneLeft"></div>
+            <div id="locationPaneRight"></div>
+        </div>
         <div id="diffContent">
             <div id="diffInfo" class="info-hidden"></div>
             <div id="viewer"></div>
@@ -39,18 +45,29 @@ function setupDOM() {
 describe('Navigation.cleanupAllMarkers()', () => {
     beforeEach(() => setupDOM());
 
-    it('locationPane 内の .marker が削除される', () => {
-        const locationPane = AppState.elements.locationPane;
+    it('locationPaneLeft 内の .marker が削除される', () => {
+        const paneLeft = AppState.elements.locationPaneLeft;
         const m1 = document.createElement('div');
         m1.classList.add('marker');
         const m2 = document.createElement('div');
         m2.classList.add('marker');
-        locationPane.appendChild(m1);
-        locationPane.appendChild(m2);
+        paneLeft.appendChild(m1);
+        paneLeft.appendChild(m2);
 
         Navigation.cleanupAllMarkers();
 
-        expect(locationPane.querySelectorAll('.marker').length).toBe(0);
+        expect(paneLeft.querySelectorAll('.marker').length).toBe(0);
+    });
+
+    it('locationPaneRight 内の .marker が削除される', () => {
+        const paneRight = AppState.elements.locationPaneRight;
+        const m = document.createElement('div');
+        m.classList.add('marker');
+        paneRight.appendChild(m);
+
+        Navigation.cleanupAllMarkers();
+
+        expect(paneRight.querySelectorAll('.marker').length).toBe(0);
     });
 
     it('マーカーが0件でも例外が発生しない', () => {
