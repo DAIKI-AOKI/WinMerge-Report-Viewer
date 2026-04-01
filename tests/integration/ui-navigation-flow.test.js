@@ -209,16 +209,12 @@ describe('UIナビゲーションフロー - ドロップエリア', () => {
     });
 
     it('ファイルドロップで FileHandler.process が呼ばれる', () => {
+        // jsdom では DragEvent / DataTransfer が未定義のため、
+        // EventManager.handleDrop() を直接呼び出してドロップ処理を検証する
         const file = new File(['test'], 'test.htm', { type: 'text/html' });
-        const dropEvent = new DragEvent('drop', {
-            bubbles: true,
-            dataTransfer: new DataTransfer(),
-        });
-        Object.defineProperty(dropEvent, 'dataTransfer', {
-            value: { files: [file] }
-        });
+        const fakeEvent = { dataTransfer: { files: [file] } };
 
-        AppState.elements.dropArea.dispatchEvent(dropEvent);
+        EventManager.handleDrop(fakeEvent);
 
         expect(FileHandler.process).toHaveBeenCalledWith(file);
     });
