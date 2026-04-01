@@ -1,38 +1,42 @@
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
-  test: {
-    // Layer 1（純粋ロジック）は node 環境、Layer 2（DOM依存）は jsdom 環境
-    // ファイルパスのパターンで環境を切り替える
-    environmentMatchGlobs: [
-      ['tests/dom/**', 'jsdom'],
-      ['tests/integration/**', 'jsdom'],  // 統合テストは jsdom 環境で実行
-    ],
-    environment: 'node',
+    test: {
+        // グローバル変数（AppState, Logger, CONFIG 等）を setup.js で注入するために必要
+        globals: true,
 
-    // テストファイルの場所
-    include: ['tests/**/*.test.js'],
+        // 全テストを jsdom 環境で実行（DOM 操作を含むテストが多いため）
+        environment: 'jsdom',
 
-    // カバレッジ設定
-    coverage: {
-      provider: 'v8',
-      include: ['js/**/*.js'],
-      exclude: [
-        'js/main.js',          // エントリーポイント（統合テストの対象）
-        'js/event-manager.js', // UIイベント（統合テストの対象）
-        'js/ui.js',            // 表示制御（統合テストの対象）
-      ],
-      reporter: ['text', 'lcov', 'html'],
-      reportsDirectory: 'coverage',
-      thresholds: {
-        lines: 60,
-        functions: 60,
-        branches: 55,
-        statements: 60,
-      },
+        // グローバル変数の注入・モック定義
+        setupFiles: ['./tests/setup.js'],
+
+        // E2Eテスト（Playwright）を Vitest の対象から除外
+        exclude: [
+            '**/node_modules/**',
+            '**/tests/e2e/**',
+        ],
+
+        // カバレッジ設定
+        coverage: {
+            provider: 'v8',
+            include: ['js/**/*.js'],
+            exclude: [
+                'js/main.js',          // エントリーポイント（統合テストの対象）
+                'js/event-manager.js', // UIイベント（統合テストの対象）
+                'js/ui.js',            // 表示制御（統合テストの対象）
+            ],
+            reporter: ['text', 'lcov', 'html'],
+            reportsDirectory: 'coverage',
+            thresholds: {
+                lines: 60,
+                functions: 60,
+                branches: 55,
+                statements: 60,
+            },
+        },
+
+        // テスト結果の表示
+        reporters: ['verbose'],
     },
-
-    // テスト結果の表示
-    reporters: ['verbose'],
-  },
 });
