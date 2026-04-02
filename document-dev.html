@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WinMerge Report Viewer 開発者ガイド</title>
+    <link rel="icon" href="favicon.ico">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.7;
+            padding: 20px;
+            max-width: 1000px;
+            margin: 0 auto;
+            background-color: #f4f7f6;
+            color: #333;
+        }
+
+        h1 { color: #004d40; margin-top: 0; text-align: center; }
+        h2 { color: #00796b; padding-left: 10px; margin-top: 10px; margin-bottom: 10px; }
+        h3 { color: #004d40; margin-top: 10px; margin-bottom: 5px; }
+
+        .section-box {
+            background-color: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .section-box p, .section-box ol, .section-box ul { margin-top: 0; }
+
+        .info-box {
+            border: 1px solid #00796b;
+            border-left-width: 4px;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+
+        .warning-box {
+            border: 1px solid #f9a825;
+            border-left-width: 4px;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+
+        th, td {
+            border: 1px solid #ccc;
+            padding: 10px;
+            text-align: left;
+        }
+
+        th { background-color: #e0f2f1; color: #004d40; }
+
+        code {
+            background: #f0f4f3;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            padding: 1px 5px;
+            font-family: 'Consolas', monospace;
+            font-size: 0.9em;
+        }
+
+        pre {
+            background: #263238;
+            color: #eceff1;
+            padding: 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+
+        pre code {
+            background: none;
+            border: none;
+            color: inherit;
+            padding: 0;
+            font-size: inherit;
+        }
+
+        .back-to-top {
+            display: block;
+            text-align: right;
+            margin-top: 16px;
+            padding-top: 10px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .back-to-top a {
+            color: #00796b;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .back-to-top a i { margin-right: 4px; }
+
+        .toc-container {
+            background: linear-gradient(135deg, #f0f9f8 0%, #f7fbf2 100%);
+            border: 2px solid #00796b;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 25px 0;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .toc-title {
+            color: #004d40;
+            font-size: 1.3em;
+            font-weight: bold;
+            margin: 0 0 12px 0;
+            display: flex;
+            align-items: center;
+        }
+
+        .toc-title i { margin-right: 10px; color: #00796b; }
+
+        .toc-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 5px 15px;
+        }
+
+        .toc-item { display: flex; align-items: center; }
+
+        .toc-item a {
+            color: #004d40;
+            text-decoration: none;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            padding: 6px 10px;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+
+        .toc-item a:hover {
+            background: rgba(0,121,107,0.1);
+            transform: translateX(5px);
+        }
+
+        .toc-item a i { margin-right: 8px; font-size: 0.9em; color: #004d40; }
+
+        .mr-0_5rem { margin-right: .5rem; }
+        .mr-1rem { margin-right: 1rem; }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+            margin-left: 6px;
+        }
+
+        .badge-green { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
+        .badge-blue  { background: #e3f2fd; color: #1565c0; border: 1px solid #90caf9; }
+        .badge-gray  { background: #f5f5f5; color: #616161; border: 1px solid #bdbdbd; }
+    </style>
+</head>
+
+<body>
+<div id="main-content">
+
+    <h1 id="top"><i class="fas fa-code mr-1rem"></i>WinMerge Report Viewer 開発者ガイド</h1>
+
+    <p style="text-align:center;">
+        <a href="document.html" style="color:#00796b; text-decoration:none;">
+            <i class="fas fa-arrow-left"></i> ユーザー向け利用ガイドへ
+        </a>
+    </p>
+
+    <!-- 目次 -->
+    <div class="toc-container">
+        <h2 class="toc-title">
+            <i class="fas fa-list-ul"></i>目次（クリックでジャンプ）
+        </h2>
+        <div class="toc-grid">
+            <div class="toc-item">
+                <a href="#tech-stack"><i class="fas fa-layer-group"></i>使用技術</a>
+            </div>
+            <div class="toc-item">
+                <a href="#module-structure"><i class="fas fa-sitemap"></i>モジュール構成</a>
+            </div>
+            <div class="toc-item">
+                <a href="#data-flow"><i class="fas fa-stream"></i>データフロー</a>
+            </div>
+            <div class="toc-item">
+                <a href="#diff-colors"><i class="fas fa-palette"></i>差分色定義</a>
+            </div>
+            <div class="toc-item">
+                <a href="#testing"><i class="fas fa-vial"></i>テスト構成</a>
+            </div>
+            <div class="toc-item">
+                <a href="#debug"><i class="fas fa-bug"></i>デバッグ方法</a>
+            </div>
+            <div class="toc-item">
+                <a href="#privacy"><i class="fas fa-shield-alt"></i>データの取り扱い</a>
+            </div>
+            <div class="toc-item">
+                <a href="#branch-strategy"><i class="fas fa-code-branch"></i>ブランチ戦略</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 使用技術 -->
+    <div class="section-box" id="tech-stack">
+        <h2><i class="fas fa-layer-group mr-0_5rem"></i>使用技術</h2>
+        <table>
+            <thead>
+                <tr><th>カテゴリ</th><th>技術</th><th>備考</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>言語</td><td>Vanilla JavaScript (ES6+)</td><td>フレームワーク不使用</td></tr>
+                <tr><td>モジュール</td><td>ES Modules (import/export)</td><td>type="module" で読み込み</td></tr>
+                <tr><td>セキュリティ</td><td>DOMParser + CSP</td><td>Content Security Policy をメタタグで設定</td></tr>
+                <tr><td>UI アイコン</td><td>Font Awesome 6.4.0</td><td>CDN 経由（SRI ハッシュ付き）</td></tr>
+                <tr><td>ユニットテスト</td><td>Vitest 2.x + jsdom</td><td>Layer 1（Node）/ Layer 2（jsdom）環境分離</td></tr>
+                <tr><td>E2E テスト</td><td>Playwright</td><td>Chromium で自動実行</td></tr>
+                <tr><td>CI/CD</td><td>GitHub Actions</td><td>Node.js 22 LTS・main ブランチへの push で自動実行</td></tr>
+            </tbody>
+        </table>
+        <div class="back-to-top"><a href="#top"><i class="fas fa-chevron-up"></i>トップへ戻る</a></div>
+    </div>
+
+    <!-- モジュール構成 -->
+    <div class="section-box" id="module-structure">
+        <h2><i class="fas fa-sitemap mr-0_5rem"></i>モジュール構成</h2>
+        <p>各モジュールは単一責任原則に基づいて分割されています。</p>
+        <table>
+            <thead>
+                <tr><th>ファイル</th><th>役割</th><th>主な依存</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>main.js</code></td>
+                    <td>エントリーポイント・初期化</td>
+                    <td>全モジュール</td>
+                </tr>
+                <tr>
+                    <td><code>config.js</code></td>
+                    <td>設定定数（差分色・サイズ制限等）</td>
+                    <td>なし</td>
+                </tr>
+                <tr>
+                    <td><code>state.js</code></td>
+                    <td>アプリケーション状態管理・Logger</td>
+                    <td>なし</td>
+                </tr>
+                <tr>
+                    <td><code>errors.js</code></td>
+                    <td>カスタムエラークラス定義</td>
+                    <td>なし</td>
+                </tr>
+                <tr>
+                    <td><code>error-handler.js</code></td>
+                    <td>エラーの一元処理・ユーザー通知</td>
+                    <td>errors.js, state.js, ui.js</td>
+                </tr>
+                <tr>
+                    <td><code>event-manager.js</code></td>
+                    <td>イベントリスナー管理・ドラッグ&ドロップ</td>
+                    <td>config.js, state.js, file-handler.js, navigation.js</td>
+                </tr>
+                <tr>
+                    <td><code>file-handler.js</code></td>
+                    <td>ファイル読み込み・処理オーケストレーター</td>
+                    <td>ほぼ全モジュール</td>
+                </tr>
+                <tr>
+                    <td><code>html-processor.js</code></td>
+                    <td>HTML サニタイズ・スタイルインポート</td>
+                    <td>config.js, state.js, errors.js, table-processor.js</td>
+                </tr>
+                <tr>
+                    <td><code>table-processor.js</code></td>
+                    <td>差分テーブル処理・固定ヘッダー・行の色取得</td>
+                    <td>config.js, state.js, utils.js</td>
+                </tr>
+                <tr>
+                    <td><code>diff-detector.js</code></td>
+                    <td>差分ブロック検出・ミニマップマーカー生成</td>
+                    <td>config.js, state.js, utils.js, table-processor.js</td>
+                </tr>
+                <tr>
+                    <td><code>navigation.js</code></td>
+                    <td>差分ナビゲーション・インターフェースリセット</td>
+                    <td>config.js, state.js, utils.js, ui.js, html-processor.js, diff-detector.js</td>
+                </tr>
+                <tr>
+                    <td><code>progress-indicator.js</code></td>
+                    <td>プログレス表示（依存なし・独立モジュール）</td>
+                    <td>なし</td>
+                </tr>
+                <tr>
+                    <td><code>ui.js</code></td>
+                    <td>UI 表示制御（メッセージ・ローディング等）</td>
+                    <td>config.js, state.js, utils.js</td>
+                </tr>
+                <tr>
+                    <td><code>utils.js</code></td>
+                    <td>汎用ユーティリティ・CSS 管理</td>
+                    <td>config.js, state.js</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="warning-box">
+            <strong><i class="fas fa-exclamation-triangle"></i> _legacy/ について</strong><br>
+            <code>_legacy/marker-manager.js</code> は行単位マーカー機能（削除済み）の残骸です。
+            どのモジュールからも import されておらず、<code>AppState.diffRows</code> 等の削除済みプロパティを参照するため、
+            import・実行すると即座にエラーになります。参照禁止。
+        </div>
+        <div class="back-to-top"><a href="#top"><i class="fas fa-chevron-up"></i>トップへ戻る</a></div>
+    </div>
+
+    <!-- データフロー -->
+    <div class="section-box" id="data-flow">
+        <h2><i class="fas fa-stream mr-0_5rem"></i>データフロー（ファイル処理）</h2>
+        <p>ファイルが選択されてから差分表示までの処理ステップです。<code>file-handler.js</code> がオーケストレーターとして各モジュールを順に呼び出します。</p>
+        <table>
+            <thead>
+                <tr><th>ステップ</th><th>処理内容</th><th>担当モジュール</th><th>進捗</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>read</td><td>FileReader でファイルを読み込み・文字コード判定（UTF-8 / Shift-JIS）</td><td>file-handler.js</td><td>0〜20%</td></tr>
+                <tr><td>sanitize</td><td>HTML をサニタイズ（危険タグ・属性を除去）</td><td>html-processor.js</td><td>20〜40%</td></tr>
+                <tr><td>parse</td><td>DOMParser で差分テーブルを抽出・スタイルをインポート</td><td>html-processor.js</td><td>40〜50%</td></tr>
+                <tr><td>detect</td><td>差分ブロックを検出し <code>AppState.diffBlocks</code> に格納</td><td>diff-detector.js</td><td>50〜70%</td></tr>
+                <tr><td>marker</td><td>ミニマップマーカーを左右ペインに生成・配置</td><td>diff-detector.js</td><td>70〜90%</td></tr>
+                <tr><td>render</td><td>テーブルを DOM に挿入・ナビゲーションボタンを設定</td><td>file-handler.js</td><td>90〜100%</td></tr>
+            </tbody>
+        </table>
+        <div class="back-to-top"><a href="#top"><i class="fas fa-chevron-up"></i>トップへ戻る</a></div>
+    </div>
+
+    <!-- 差分色定義 -->
+    <div class="section-box" id="diff-colors">
+        <h2><i class="fas fa-palette mr-0_5rem"></i>差分色定義（config.js）</h2>
+        <p>差分色は <code>config.js</code> の <code>DIFF_COLOR_MAP</code> で一元管理しています。変更する場合はここだけ編集してください。</p>
+        <div class="info-box">
+            WinMerge のデフォルトカラースキーム（Default.ini）と一致しています。
+            WinMerge 内部は BGR 形式ですが、HTML レポート出力時に RGB に変換されるため RGB で定義しています。
+        </div>
+        <table>
+            <thead>
+                <tr><th>type</th><th>label</th><th>color（RGB）</th><th>HEX</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>changed</code></td><td>変更行</td><td><code>rgb(239, 203, 5)</code></td><td>#efcb05</td></tr>
+                <tr><td><code>word</code></td><td>変更行内差分</td><td><code>rgb(241, 226, 173)</code></td><td>#f1e2ad</td></tr>
+                <tr><td><code>del</code></td><td>削除・追加行</td><td><code>rgb(255, 160, 160)</code></td><td>#ffa0a0</td></tr>
+                <tr><td><code>moved_from</code></td><td>移動元</td><td><code>rgb(255, 170, 130)</code></td><td>#ffaa82</td></tr>
+                <tr><td><code>moved_to</code></td><td>移動先</td><td><code>rgb(200, 129, 108)</code></td><td>#c8816c</td></tr>
+                <tr><td><code>separator</code></td><td>区切り行</td><td><code>rgb(192, 192, 192)</code></td><td>#c0c0c0</td></tr>
+            </tbody>
+        </table>
+        <div class="warning-box">
+            <strong>⚠ isNeutral() の閾値について</strong><br>
+            <code>table-processor.js</code> の <code>isNeutral()</code> は閾値 240 で白・薄グレーを中立色と判定します。
+            差分色を変更する場合は、すべての色のチャンネル最小値が 240 を超えないことを確認してください。
+        </div>
+        <div class="back-to-top"><a href="#top"><i class="fas fa-chevron-up"></i>トップへ戻る</a></div>
+    </div>
+
+    <!-- テスト構成 -->
+    <div class="section-box" id="testing">
+        <h2><i class="fas fa-vial mr-0_5rem"></i>テスト構成</h2>
+        <table>
+            <thead>
+                <tr><th>種別</th><th>ディレクトリ</th><th>ツール</th><th>環境</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>ユニットテスト</td>
+                    <td><code>tests/unit/</code></td>
+                    <td>Vitest</td>
+                    <td>Node（DOM なし）</td>
+                </tr>
+                <tr>
+                    <td>DOM テスト</td>
+                    <td><code>tests/dom/</code></td>
+                    <td>Vitest + jsdom</td>
+                    <td>jsdom（DOM あり）</td>
+                </tr>
+                <tr>
+                    <td>統合テスト</td>
+                    <td><code>tests/integration/</code></td>
+                    <td>Vitest + jsdom</td>
+                    <td>jsdom（複数モジュール連携）</td>
+                </tr>
+                <tr>
+                    <td>E2E テスト</td>
+                    <td><code>tests/e2e/</code></td>
+                    <td>Playwright</td>
+                    <td>Chromium（実ブラウザ）</td>
+                </tr>
+            </tbody>
+        </table>
+        <h3>テスト実行コマンド</h3>
+        <pre><code># ユニット・統合テスト（1回実行）
+npm test
+
+# カバレッジレポート付き
+npm run test:coverage
+
+# ファイル変更を監視
+npm run test:watch
+
+# E2E テスト
+npm run test:e2e</code></pre>
+        <div class="back-to-top"><a href="#top"><i class="fas fa-chevron-up"></i>トップへ戻る</a></div>
+    </div>
+
+    <!-- デバッグ方法 -->
+    <div class="section-box" id="debug">
+        <h2><i class="fas fa-bug mr-0_5rem"></i>デバッグ方法</h2>
+        <p>URL に <code>?debug=true</code> を付けるか、<code>localhost</code> / <code>127.0.0.1</code> で開くとデバッグモードが有効になります。</p>
+        <h3>ブラウザコンソールで使用可能なデバッグ関数</h3>
+        <pre><code>wmv.debug.showBlocks()      // 差分ブロック統計・一覧
+wmv.debug.visualizeBlocks() // ブロックを色枠で視覚化
+wmv.debug.memoryStatus()    // メモリ使用量
+wmv.debug.appState()        // AppState の状態ダンプ
+wmv.debug.all()             // 上記すべて</code></pre>
+        <div class="back-to-top"><a href="#top"><i class="fas fa-chevron-up"></i>トップへ戻る</a></div>
+    </div>
+
+    <!-- データの取り扱い -->
+    <div class="section-box" id="privacy">
+        <h2><i class="fas fa-shield-alt mr-0_5rem"></i>データの取り扱い</h2>
+        <table>
+            <thead>
+                <tr><th>項目</th><th>内容</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>データ送信</td><td>なし（すべてブラウザ内ローカル処理）</td></tr>
+                <tr><td>サーバー通信</td><td>Font Awesome CDN 読み込みのみ</td></tr>
+                <tr><td>プライバシー</td><td>ファイルはブラウザ内でのみ処理。外部に送信しない</td></tr>
+                <tr><td>ログ収集</td><td>なし</td></tr>
+                <tr><td>localStorage 使用</td><td>なし</td></tr>
+            </tbody>
+        </table>
+        <div class="back-to-top"><a href="#top"><i class="fas fa-chevron-up"></i>トップへ戻る</a></div>
+    </div>
+
+    <!-- ブランチ戦略 -->
+    <div class="section-box" id="branch-strategy">
+        <h2><i class="fas fa-code-branch mr-0_5rem"></i>ブランチ戦略</h2>
+        <table>
+            <thead>
+                <tr><th>ブランチ</th><th>用途</th><th>内容</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>main</code></td>
+                    <td>開発・CI</td>
+                    <td>ソースコード・テスト・設定ファイルすべてを含む開発用ブランチ</td>
+                </tr>
+                <tr>
+                    <td><code>gh-pages</code></td>
+                    <td>配布・公開</td>
+                    <td>配布用ファイルのみ（index.html / style.css / js/ / document.html 等）</td>
+                </tr>
+            </tbody>
+        </table>
+        <h3>gh-pages 更新手順</h3>
+        <pre><code>git checkout gh-pages
+git checkout main -- index.html style.css favicon.ico document.html js/
+git add .
+git commit -m "chore: update gh-pages"
+git push origin gh-pages
+git checkout main</code></pre>
+        <div class="back-to-top"><a href="#top"><i class="fas fa-chevron-up"></i>トップへ戻る</a></div>
+    </div>
+
+</div>
+
+<script>
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    });
+</script>
+</body>
+</html>
