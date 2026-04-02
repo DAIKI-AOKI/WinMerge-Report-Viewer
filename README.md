@@ -1,4 +1,4 @@
-# WinMerge Report Viewer v2
+# WinMerge Report Viewer
 
 WinMerge が出力した HTML 差分レポートを、より快適にレビューするためのビューアです。
 
@@ -24,38 +24,60 @@ WinMerge が出力した HTML 差分レポートを、より快適にレビュ�
 ├── index.html
 ├── style.css
 ├── js/
-│   ├── main.js              # エントリーポイント・初期化
-│   ├── config.js            # 設定定数
-│   ├── state.js             # アプリケーション状態管理
-│   ├── errors.js            # カスタムエラークラス
-│   ├── error-handler.js     # エラーハンドリング
-│   ├── event-manager.js     # イベントリスナー管理
-│   ├── file-handler.js      # ファイル読み込み・処理オーケストレーター
-│   ├── html-processor.js    # HTML サニタイズ・スタイルインポート
-│   ├── table-processor.js   # 差分テーブル処理・固定ヘッダー
-│   ├── diff-detector.js     # 差分ブロック検出・ミニマップマーカー生成
-│   ├── navigation.js        # 差分ナビゲーション・リセット
-│   ├── progress-indicator.js# プログレス表示
-│   ├── ui.js                # UI 表示制御
-│   └── utils.js             # 汎用ユーティリティ
-└── _legacy/
-    └── marker-manager.js    # 旧・行単位マーカー（使用停止・参照禁止）
+│   ├── main.js               # エントリーポイント・初期化
+│   ├── config.js             # 設定定数
+│   ├── state.js              # アプリケーション状態管理
+│   ├── errors.js             # カスタムエラークラス
+│   ├── error-handler.js      # エラーハンドリング
+│   ├── event-manager.js      # イベントリスナー管理
+│   ├── file-handler.js       # ファイル読み込み・処理オーケストレーター
+│   ├── html-processor.js     # HTML サニタイズ・スタイルインポート
+│   ├── table-processor.js    # 差分テーブル処理・固定ヘッダー
+│   ├── diff-detector.js      # 差分ブロック検出・ミニマップマーカー生成
+│   ├── navigation.js         # 差分ナビゲーション・リセット
+│   ├── progress-indicator.js # プログレス表示
+│   ├── ui.js                 # UI 表示制御
+│   └── utils.js              # 汎用ユーティリティ
+├── _legacy/
+│   └── marker-manager.js     # 旧・行単位マーカー（使用停止・参照禁止）
+└── tests/
+    ├── unit/                 # ユニットテスト（Vitest・Node 環境）
+    ├── dom/                  # DOM テスト（Vitest・jsdom 環境）
+    ├── integration/          # 統合テスト（モジュール間連携）
+    └── e2e/                  # E2E テスト（Playwright）
 ```
 
-## 前バージョン（v1）との主な差分
+## 自動テスト
 
-| 項目 | 内容 |
-|---|---|
-| バグ修正 | `TableProcessingError` の二重ラップを解消 |
-| バグ修正 | `currentDiffIndex` の二重代入を解消（`jumpToBlock` に一元化） |
-| 設計改善 | `_Navigation` / `setNavigation` を `BlockMarkerGenerator` スコープ内に移動 |
-| 設計改善 | 使用停止済みの `WeakMap`（`markerEventListeners`）を全モジュールから削除 |
-| 設計改善 | `isNeutral()` の重複条件を削除・閾値の根拠をコメントに明記 |
-| 整理 | `computeTableHash` の FNV-1a 説明を JSDoc に統合 |
-| 整理 | `config.js` のコメントアウトコード（`loadUserColorConfig` 等）を削除 |
-| 整理 | `main.js` の不要な `typeof` ガードを削除 |
-| 整理 | `progress-indicator.js` の `hideTimeout` / `fallbackTimeout` を分離 |
-| 隔離 | `marker-manager.js` を `_legacy/` に移動 |
+[Vitest](https://vitest.dev/) によるユニット・統合テストと [Playwright](https://playwright.dev/) による E2E テストを導入しています。GitHub Actions で main ブランチへの push 時に自動実行されます。
+
+### テストの実行
+
+```bash
+# 依存パッケージをインストール
+npm install
+
+# ユニット・統合テスト（1回実行）
+npm test
+
+# ユニット・統合テスト（ファイル変更を監視）
+npm run test:watch
+
+# カバレッジレポート付きで実行
+npm run test:coverage
+
+# E2E テスト（別途ローカルサーバーが必要）
+npm run test:e2e
+```
+
+### テスト構成
+
+| 種別 | ツール | 対象 |
+|---|---|---|
+| ユニットテスト | Vitest | 各モジュールの純粋ロジック |
+| DOM テスト | Vitest + jsdom | DOM を伴う処理（差分検出・ミニマップ等） |
+| 統合テスト | Vitest + jsdom | モジュール間の連携フロー |
+| E2E テスト | Playwright | ブラウザ上での実際のユーザー操作 |
 
 ## 開発・デバッグ
 
