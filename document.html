@@ -191,6 +191,50 @@
             background-color: rgb(239, 203, 5);
         }
 
+        /* 変更行 */
+        .diff-word {
+            background-color: rgb(241, 226, 173);
+        }
+
+        /* 行内差分 */
+        .diff-del {
+            background-color: rgb(255, 160, 160);
+        }
+
+        /* 削除・追加行 */
+        .diff-moved {
+            background-color: rgb(255, 170, 130);
+        }
+
+        /* 移動元 */
+        .diff-moved-to {
+            background-color: rgb(200, 129, 108);
+        }
+
+        /* 移動先 */
+        .diff-sep {
+            background-color: rgb(192, 192, 192);
+        }
+
+        /* 区切り行 */
+
+        /* ミニマップマーカー色（style.css の CSS 変数に準拠） */
+        .minimap-changed {
+            background-color: #FFD700;
+        }
+
+        /* 変更行・行内差分 */
+        .minimap-del {
+            background-color: #C0C0C0;
+        }
+
+        /* 削除・追加行・区切り */
+        .minimap-moved {
+            background-color: #FFA500;
+        }
+
+        /* 移動元・移動先 */
+
         /* #c0c0c0 区切り行 */
         .mr-0_5rem {
             margin-right: .5rem;
@@ -688,9 +732,7 @@
             <div class="security-box">
                 <p class="mb-0_5rem"><strong><i class="fas fa-exclamation-circle"></i> 使用可能なファイル</strong></p>
                 <ul>
-                    <li><strong>WinMergeで生成したHTMLレポート（推奨）</strong></li>
-                    <li>社内で作成されたWinMergeレポート</li>
-                    <li>信頼できる同僚から受け取ったレポート</li>
+                    <li><strong>WinMergeで生成したHTMLレポート</strong></li>
                 </ul>
             </div>
 
@@ -779,18 +821,55 @@
             <h3>ミニマップ（ロケーションペイン）</h3>
             <p>
                 画面左端に表示される縦長のナビゲーションバーです。<br>
-                <strong>連続した差分行を1つの「差分ブロック」としてまとめて表示</strong>します。
+                <strong>連続した差分行を1つの「差分ブロック」としてまとめて表示</strong>します。<br>
+                左ペインが旧ファイル（旧）、右ペインが新ファイル（新）の差分位置を示します。
             </p>
 
-            <ul>
-                <li class="mb-0_5rem">
-                    <p>
-                        <span class="color-box diff-changed"></span>
-                        <strong>黄色のマーカー</strong>
-                    </p>
-                    すべての差分ブロックを黄色で表示します。
-                </li>
+            <h4>マーカーの色</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th class="text-center">色</th>
+                        <th>差分の種類</th>
+                        <th>左ペイン（旧）</th>
+                        <th>右ペイン（新）</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="text-center"><span class="color-box minimap-changed"></span></td>
+                        <td>変更行・行内差分</td>
+                        <td class="text-center">✅</td>
+                        <td class="text-center">✅</td>
+                    </tr>
+                    <tr>
+                        <td class="text-center"><span class="color-box minimap-del"></span></td>
+                        <td>削除・追加行・区切り行</td>
+                        <td class="text-center">✅</td>
+                        <td class="text-center">❌</td>
+                    </tr>
+                    <tr>
+                        <td class="text-center"><span class="color-box minimap-moved"></span></td>
+                        <td>移動元</td>
+                        <td class="text-center">✅</td>
+                        <td class="text-center">❌</td>
+                    </tr>
+                    <tr>
+                        <td class="text-center"><span class="color-box minimap-moved"></span></td>
+                        <td>移動先</td>
+                        <td class="text-center">❌</td>
+                        <td class="text-center">✅</td>
+                    </tr>
+                    <tr>
+                        <td class="text-center"><span class="color-box minimap-del"></span></td>
+                        <td>区切り行</td>
+                        <td class="text-center">✅</td>
+                        <td class="text-center">✅</td>
+                    </tr>
+                </tbody>
+            </table>
 
+            <ul>
                 <li class="mb-0_5rem">
                     <strong>マーカーをクリック</strong><br>
                     該当する差分ブロックの先頭へジャンプ

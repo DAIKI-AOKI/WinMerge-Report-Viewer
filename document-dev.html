@@ -355,17 +355,18 @@
             WinMerge のデフォルトカラースキーム（Default.ini）と一致しています。
             WinMerge 内部は BGR 形式ですが、HTML レポート出力時に RGB に変換されるため RGB で定義しています。
         </div>
+        <p>ミニマップのマーカー色は <code>style.css</code> の CSS 変数（<code>--minimap-color-*</code>）で管理しています。差分色とは別系統です。</p>
         <table>
             <thead>
-                <tr><th>type</th><th>label</th><th>color（RGB）</th><th>HEX</th></tr>
+                <tr><th>type</th><th>label</th><th>差分色（RGB）</th><th>HEX</th><th>ミニマップ色</th><th>左ペイン</th><th>右ペイン</th></tr>
             </thead>
             <tbody>
-                <tr><td><code>changed</code></td><td>変更行</td><td><code>rgb(239, 203, 5)</code></td><td>#efcb05</td></tr>
-                <tr><td><code>word</code></td><td>変更行内差分</td><td><code>rgb(241, 226, 173)</code></td><td>#f1e2ad</td></tr>
-                <tr><td><code>del</code></td><td>削除・追加行</td><td><code>rgb(255, 160, 160)</code></td><td>#ffa0a0</td></tr>
-                <tr><td><code>moved_from</code></td><td>移動元</td><td><code>rgb(255, 170, 130)</code></td><td>#ffaa82</td></tr>
-                <tr><td><code>moved_to</code></td><td>移動先</td><td><code>rgb(200, 129, 108)</code></td><td>#c8816c</td></tr>
-                <tr><td><code>separator</code></td><td>区切り行</td><td><code>rgb(192, 192, 192)</code></td><td>#c0c0c0</td></tr>
+                <tr><td><code>changed</code></td><td>変更行</td><td><code>rgb(239, 203, 5)</code></td><td>#efcb05</td><td>#FFD700</td><td>✅</td><td>✅</td></tr>
+                <tr><td><code>word</code></td><td>変更行内差分</td><td><code>rgb(241, 226, 173)</code></td><td>#f1e2ad</td><td>#FFD700</td><td>✅</td><td>✅</td></tr>
+                <tr><td><code>del</code></td><td>削除・追加行</td><td><code>rgb(255, 160, 160)</code></td><td>#ffa0a0</td><td>#C0C0C0</td><td>✅</td><td>❌</td></tr>
+                <tr><td><code>moved_from</code></td><td>移動元</td><td><code>rgb(255, 170, 130)</code></td><td>#ffaa82</td><td>#FFA500</td><td>✅</td><td>❌</td></tr>
+                <tr><td><code>moved_to</code></td><td>移動先</td><td><code>rgb(200, 129, 108)</code></td><td>#c8816c</td><td>#FFA500</td><td>❌</td><td>✅</td></tr>
+                <tr><td><code>separator</code></td><td>区切り行</td><td><code>rgb(192, 192, 192)</code></td><td>#c0c0c0</td><td>#C0C0C0</td><td>✅</td><td>✅</td></tr>
             </tbody>
         </table>
         <div class="warning-box">
