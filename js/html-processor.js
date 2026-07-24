@@ -52,7 +52,7 @@ const HTMLProcessor = {
                                     if (child.nodeType === Node.TEXT_NODE || child.nodeType === Node.ELEMENT_NODE) {
                                         parent.insertBefore(child, el);
                                     }
-                                } catch (e) {
+                                } catch {
                                     Logger.warn('Child insertion skipped');
                                 }
                             });
@@ -60,10 +60,10 @@ const HTMLProcessor = {
 
                         try {
                             parent.removeChild(el);
-                        } catch (e) {
+                        } catch {
                             Logger.warn('Element removal failed');
                         }
-                    } catch (error) {
+                    } catch {
                         Logger.warn('Element removal skipped');
                     }
                 }

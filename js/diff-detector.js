@@ -197,7 +197,7 @@ const BlockMarkerGenerator = (() => {
      * @param {HTMLTableElement} table - 対象テーブル
      * @returns {void}
      */
-    function generateBlockMarkers(blocks, table) {
+    function generateBlockMarkers(blocks, _table) {
         Logger.log('=== ブロックマーカー生成開始 ===');
 
         const { diffContent } = AppState.elements;

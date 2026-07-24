@@ -89,7 +89,7 @@ const ErrorHandler = {
      * @param {HTMLParsingError} error - HTML解析エラー
      * @returns {void}
      */
-    handleHTMLParsingError(error) {
+    handleHTMLParsingError(_error) {
         UI.showMessage(
             'HTMLの解析に失敗しました。WinMerge HTMLレポートファイルであることを確認してください。',
             'error'
@@ -101,7 +101,7 @@ const ErrorHandler = {
      * @param {TableProcessingError} error - テーブル処理エラー
      * @returns {void}
      */
-    handleTableProcessingError(error) {
+    handleTableProcessingError(_error) {
         UI.showMessage(
             '差分テーブルの処理に失敗しました。WinMerge HTMLレポートファイルであることを確認してください。',
             'error'
