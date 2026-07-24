@@ -38,8 +38,6 @@ WinMerge が出力した HTML 差分レポートを、より快適にレビュ�
 │   ├── progress-indicator.js # プログレス表示
 │   ├── ui.js                 # UI 表示制御
 │   └── utils.js              # 汎用ユーティリティ
-├── _legacy/
-│   └── marker-manager.js     # 旧・行単位マーカー（使用停止・参照禁止）
 └── tests/
     ├── unit/                 # ユニットテスト（Vitest・Node 環境）
     ├── dom/                  # DOM テスト（Vitest・jsdom 環境）
