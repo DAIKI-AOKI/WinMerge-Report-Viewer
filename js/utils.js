@@ -2,7 +2,7 @@
  * WinMerge Report Viewer - ユーティリティ（改善版）
  * 
  * 汎用的なユーティリティ関数とCSS管理
- * 依存: なし
+ * 依存: config.js, state.js
  */
 
 'use strict';
