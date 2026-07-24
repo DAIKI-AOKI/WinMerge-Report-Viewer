@@ -1,7 +1,8 @@
 /**
  * FileHandler - ファイル処理モジュール（エラーハンドリング改善版）
- * 依存: config.js, state.js, utils.js, error-handler.js, ui.js, html-processor.js, 
- *       table-processor.js, diff-detector.js, navigation.js
+ * 依存: config.js, state.js, utils.js, errors.js, error-handler.js, ui.js, 
+ *       html-processor.js, table-processor.js, diff-detector.js, navigation.js, 
+ *       progress-indicator.js
  * 
  * @fileoverview ファイルの検証、読み込み、処理の管理
  */
