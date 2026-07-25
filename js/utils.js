@@ -222,5 +222,4 @@ const CSSManager = {
         element.classList.add(hiddenClass);
     },
 };
-
 export { Utils, CSSManager };
