@@ -2,7 +2,7 @@
  * DiffBlockDetector & BlockMarkerGenerator (改善版 v6.1)
  * 差分ブロック検出とマーカー生成（青枠リサイズ対応版）
  * 依存: config.js, state.js, utils.js, table-processor.js
- * 
+ *
  * @fileoverview 差分ブロックの検出とマーカー生成を行うモジュール
  */
 
@@ -33,11 +33,11 @@ const DiffBlockDetector = (() => {
      */
     function detectBlocks(table) {
         Logger.log('=== ブロック検出開始 ===');
-        
+
         const rows = table.querySelectorAll('tr');
         const blocks = [];
         let currentBlock = null;
-        
+
         rows.forEach((row, index) => {
             // 左列(旧ファイル)・右列(新ファイル)の色を個別に取得
             const { left: leftColor, right: rightColor } = TableProcessor.getRowColors(row);
@@ -45,17 +45,20 @@ const DiffBlockDetector = (() => {
 
             if (color) {
                 const type = _colorToType(color);
-                
+
                 // 同じタイプで連続している場合は結合
-                if (currentBlock && 
-                    currentBlock.type === type && 
-                    currentBlock.endIndex === index - 1) {
+                if (
+                    currentBlock &&
+                    currentBlock.type === type &&
+                    currentBlock.endIndex === index - 1
+                ) {
                     currentBlock.endIndex = index;
                     currentBlock.rows.push(row);
                 } else {
                     if (currentBlock) {
                         blocks.push(currentBlock);
                     }
+                    // prettier-ignore
                     currentBlock = {
                         id: blocks.length,
                         type: type,
@@ -74,15 +77,15 @@ const DiffBlockDetector = (() => {
                 }
             }
         });
-        
+
         if (currentBlock) {
             blocks.push(currentBlock);
         }
-        
+
         Logger.log(`検出されたブロック数: ${blocks.length}`);
         return blocks;
     }
-    
+
     /**
      * 背景色から差分タイプを判定
      * CONFIG.DIFF_COLOR_MAP を参照することで、色設定の変更に自動追従する。
@@ -92,10 +95,10 @@ const DiffBlockDetector = (() => {
      * @returns {string} 差分タイプ（CONFIG.DIFF_COLOR_MAP の type 値、または 'unknown'）
      */
     function _colorToType(color) {
-        const entry = CONFIG.DIFF_COLOR_MAP.find(e => e.color === color);
+        const entry = CONFIG.DIFF_COLOR_MAP.find((e) => e.color === color);
         return entry ? entry.type : 'unknown';
     }
-    
+
     /**
      * 差分タイプをカテゴリに分類するための定数（モジュールスコープ）
      * 呼び出しごとに Set を生成するコストを避けるため、ここで一度だけ定義する。
@@ -133,10 +136,10 @@ const DiffBlockDetector = (() => {
             delBlocks: 0,
             totalAddLines: 0,
             totalDelLines: 0,
-            averageBlockSize: 0
+            averageBlockSize: 0,
         };
-        
-        blocks.forEach(block => {
+
+        blocks.forEach((block) => {
             const category = _classifyBlockType(block.type);
             if (category === 'add') {
                 stats.addBlocks++;
@@ -146,17 +149,16 @@ const DiffBlockDetector = (() => {
                 stats.totalDelLines += block.rows.length;
             }
         });
-        
-        stats.averageBlockSize = blocks.length > 0 
-            ? (stats.totalAddLines + stats.totalDelLines) / blocks.length 
-            : 0;
-        
+
+        stats.averageBlockSize =
+            blocks.length > 0 ? (stats.totalAddLines + stats.totalDelLines) / blocks.length : 0;
+
         return stats;
     }
 
     return {
         detectBlocks,
-        getBlockStats
+        getBlockStats,
     };
 })();
 
@@ -174,14 +176,16 @@ const BlockMarkerGenerator = (() => {
      * @param {Object} nav - Navigation モジュール
      * @returns {void}
      */
-    function setNavigation(nav) { _Navigation = nav; }
+    function setNavigation(nav) {
+        _Navigation = nav;
+    }
 
     /** @type {boolean} イベント委譲の初期化フラグ */
     let delegatedEventsInitialized = false;
-    
+
     /** @type {Function|null} クリックイベントハンドラの参照 */
     let clickHandler = null;
-    
+
     /** @type {Function|null} キーボードイベントハンドラの参照 */
     let keydownHandler = null;
 
@@ -231,14 +235,16 @@ const BlockMarkerGenerator = (() => {
 
         if (contentHeight === 0) {
             if (retryCount >= MAX_RETRY) {
-                Logger.warn(`_placeBlockMarkers: scrollHeight が ${MAX_RETRY} フレーム後も 0 のため配置をスキップ`);
+                Logger.warn(
+                    `_placeBlockMarkers: scrollHeight が ${MAX_RETRY} フレーム後も 0 のため配置をスキップ`
+                );
                 return;
             }
             requestAnimationFrame(() => _placeBlockMarkers(blocks, diffContent, retryCount + 1));
             return;
         }
 
-        const paneLeft  = AppState.elements.locationPaneLeft;
+        const paneLeft = AppState.elements.locationPaneLeft;
         const paneRight = AppState.elements.locationPaneRight;
 
         // ペインの実際の高さを取得（ヘッダー込みの全体高さ）
@@ -253,33 +259,52 @@ const BlockMarkerGenerator = (() => {
         //   topPx    = 16 + (rowOffsetTop / contentH) * (paneH - 16)
         //   heightPx = (rowHeight / contentH) * (paneH - 16)  ← 最小値保証あり
         const HEADER_H = 16;
-        const availH   = paneHeight - HEADER_H;
+        const availH = paneHeight - HEADER_H;
 
         blocks.forEach((block, index) => {
             const firstRow = block.rows[0];
-            const lastRow  = block.rows[block.rows.length - 1];
-            const top      = firstRow.offsetTop;
-            const height   = lastRow.offsetTop + lastRow.offsetHeight - top;
+            const lastRow = block.rows[block.rows.length - 1];
+            const top = firstRow.offsetTop;
+            const height = lastRow.offsetTop + lastRow.offsetHeight - top;
 
-            const topPct    = HEADER_H + (top    / contentHeight) * availH;
-            const heightPct = Math.max((height / contentHeight) * availH, CONFIG.MARKER_MIN_HEIGHT_PERCENT / 100 * availH);
+            const topPct = HEADER_H + (top / contentHeight) * availH;
+            const heightPct = Math.max(
+                (height / contentHeight) * availH,
+                (CONFIG.MARKER_MIN_HEIGHT_PERCENT / 100) * availH
+            );
 
             const showLabel = blocks.length <= CONFIG.BLOCK_LABEL_DISPLAY_THRESHOLD;
 
             // 左ペイン: block に保存した旧ファイル側の実際の色をそのまま使用
             if (block.leftColor && paneLeft) {
-                const m = _createBlockMarkerEl(index, block, topPct, heightPct, block.leftColor, showLabel);
+                const m = _createBlockMarkerEl(
+                    index,
+                    block,
+                    topPct,
+                    heightPct,
+                    block.leftColor,
+                    showLabel
+                );
                 paneLeft.appendChild(m);
             }
 
             // 右ペイン: block に保存した新ファイル側の実際の色をそのまま使用
             if (block.rightColor && paneRight) {
-                const m = _createBlockMarkerEl(index, block, topPct, heightPct, block.rightColor, showLabel);
+                const m = _createBlockMarkerEl(
+                    index,
+                    block,
+                    topPct,
+                    heightPct,
+                    block.rightColor,
+                    showLabel
+                );
                 paneRight.appendChild(m);
             }
         });
 
-        Logger.log(`✅ ブロックマーカー配置完了: ${blocks.length}個 / scrollHeight: ${contentHeight}`);
+        Logger.log(
+            `✅ ブロックマーカー配置完了: ${blocks.length}個 / scrollHeight: ${contentHeight}`
+        );
     }
 
     /**
@@ -289,34 +314,36 @@ const BlockMarkerGenerator = (() => {
     function _createBlockMarkerEl(index, block, topPct, heightPct, color, showLabel) {
         const marker = document.createElement('div');
         marker.classList.add('marker', 'block-marker');
-        marker.dataset.blockId    = block.id;
+        marker.dataset.blockId = block.id;
         marker.dataset.blockIndex = index;
-        marker.style.top             = `${topPct}px`;   // px直接指定（ヘッダー16px回避済）
-        marker.style.height          = `${heightPct}px`;
+        marker.style.top = `${topPct}px`; // px直接指定（ヘッダー16px回避済）
+        marker.style.height = `${heightPct}px`;
         marker.style.backgroundColor = color;
 
         if (showLabel) {
             const label = document.createElement('span');
-            label.className   = 'block-marker-label';
+            label.className = 'block-marker-label';
             label.textContent = index + 1;
             marker.appendChild(label);
         }
 
         marker.setAttribute('tabindex', '0');
         marker.setAttribute('role', 'button');
-        marker.setAttribute('aria-label',
-            `差分ブロック ${index + 1} (${block.rows.length}行) へジャンプ`);
+        marker.setAttribute(
+            'aria-label',
+            `差分ブロック ${index + 1} (${block.rows.length}行) へジャンプ`
+        );
 
         return marker;
     }
-    
+
     /**
      * イベント委譲を初期化（一度だけ実行）
      * @private
      * @returns {void}
      */
     function initializeDelegatedEvents() {
-        const paneLeft  = AppState.elements.locationPaneLeft;
+        const paneLeft = AppState.elements.locationPaneLeft;
         const paneRight = AppState.elements.locationPaneRight;
 
         // メモリリーク対策: 既存のハンドラを削除
@@ -352,8 +379,9 @@ const BlockMarkerGenerator = (() => {
             const m = e.target.closest('.marker.block-marker');
             if (!m) return;
             const idx = m.dataset.blockIndex;
-            document.querySelectorAll(`.block-marker[data-block-index="${idx}"]`)
-                .forEach(el => el.classList.add('block-marker-hover'));
+            document
+                .querySelectorAll(`.block-marker[data-block-index="${idx}"]`)
+                .forEach((el) => el.classList.add('block-marker-hover'));
         };
         mouseoutHandler = (e) => {
             const m = e.target.closest('.marker.block-marker');
@@ -361,18 +389,19 @@ const BlockMarkerGenerator = (() => {
             const idx = m.dataset.blockIndex;
             // 同じブロック内の別マーカーへの移動は解除しない
             if (e.relatedTarget?.closest(`.block-marker[data-block-index="${idx}"]`)) return;
-            document.querySelectorAll(`.block-marker[data-block-index="${idx}"]`)
-                .forEach(el => el.classList.remove('block-marker-hover'));
+            document
+                .querySelectorAll(`.block-marker[data-block-index="${idx}"]`)
+                .forEach((el) => el.classList.remove('block-marker-hover'));
         };
 
-        paneLeft?.addEventListener('click',     clickHandler);
-        paneLeft?.addEventListener('keydown',   keydownHandler);
+        paneLeft?.addEventListener('click', clickHandler);
+        paneLeft?.addEventListener('keydown', keydownHandler);
         paneLeft?.addEventListener('mouseover', mouseoverHandler);
-        paneLeft?.addEventListener('mouseout',  mouseoutHandler);
-        paneRight?.addEventListener('click',    clickHandler);
-        paneRight?.addEventListener('keydown',  keydownHandler);
+        paneLeft?.addEventListener('mouseout', mouseoutHandler);
+        paneRight?.addEventListener('click', clickHandler);
+        paneRight?.addEventListener('keydown', keydownHandler);
         paneRight?.addEventListener('mouseover', mouseoverHandler);
-        paneRight?.addEventListener('mouseout',  mouseoutHandler);
+        paneRight?.addEventListener('mouseout', mouseoutHandler);
 
         Logger.log('✅ Block-marker event delegation initialized (click/keydown/hover)');
     }
@@ -389,11 +418,11 @@ const BlockMarkerGenerator = (() => {
             Logger.warn('Invalid block marker index:', index);
             return;
         }
-        
+
         const block = AppState.diffBlocks[index];
         jumpToBlock(index, block);
     }
-    
+
     /**
      * 指定ブロックにジャンプ
      * @private
@@ -403,39 +432,42 @@ const BlockMarkerGenerator = (() => {
      */
     function jumpToBlock(index, block) {
         Logger.log(`ブロック ${index + 1} にジャンプ`);
-        
+
         if (!block || !block.rows || block.rows.length === 0) {
             Logger.error('無効なブロックデータ:', index);
             return;
         }
-        
+
         _Navigation?.clearCurrentDiffHighlight();
-        
+
         _createBlockHighlight(block);
-        
+
         const firstRow = block.rows[0];
-        
+
         try {
             firstRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
         } catch (error) {
             Logger.error('スクロールエラー:', error);
         }
-        
+
         AppState.currentDiffIndex = index;
         AppState.isNavigatingToDiff = true;
-        
+
         // 左右両ペインのマーカーをまとめて選択状態にする
-        document.querySelectorAll('.marker-selected').forEach(m => m.classList.remove('marker-selected'));
-        document.querySelectorAll(`.block-marker[data-block-index="${index}"]`)
-            .forEach(m => m.classList.add('marker-selected'));
-        
+        document
+            .querySelectorAll('.marker-selected')
+            .forEach((m) => m.classList.remove('marker-selected'));
+        document
+            .querySelectorAll(`.block-marker[data-block-index="${index}"]`)
+            .forEach((m) => m.classList.add('marker-selected'));
+
         setTimeout(() => {
             AppState.isNavigatingToDiff = false;
         }, CONFIG.NAVIGATION_COMPLETE_DELAY);
-        
+
         updateBlockInfo();
     }
-    
+
     /**
      * ブロックハイライトを作成
      * @private
@@ -445,32 +477,32 @@ const BlockMarkerGenerator = (() => {
     function _createBlockHighlight(block) {
         const firstRow = block.rows[0];
         const lastRow = block.rows[block.rows.length - 1];
-        
+
         const table = firstRow.closest('table');
         if (!table) return;
-        
+
         const container = table.parentElement;
         if (!container) return;
-        
+
         // 既存のハイライトを削除
         const oldWrapper = container.querySelector('.block-highlight-wrapper');
         if (oldWrapper) oldWrapper.remove();
-        
+
         const containerPosition = window.getComputedStyle(container).position;
         if (containerPosition === 'static') {
             container.style.position = 'relative';
         }
-        
+
         const tableRect = table.getBoundingClientRect();
         const containerRect = container.getBoundingClientRect();
         const firstRowRect = firstRow.getBoundingClientRect();
         const lastRowRect = lastRow.getBoundingClientRect();
-        
+
         const top = firstRowRect.top - containerRect.top + container.scrollTop;
         const height = lastRowRect.bottom - firstRowRect.top;
         const left = tableRect.left - containerRect.left;
         const width = tableRect.width;
-        
+
         const wrapper = document.createElement('div');
         wrapper.className = 'block-highlight-wrapper';
         wrapper.style.position = 'absolute';
@@ -480,13 +512,13 @@ const BlockMarkerGenerator = (() => {
         wrapper.style.height = `${height}px`;
         wrapper.style.pointerEvents = 'none';
         wrapper.style.zIndex = '5';
-        
+
         // ブロック情報を data 属性に保存（リサイズ時に使用）
         wrapper.dataset.blockIndex = AppState.currentDiffIndex;
-        
+
         container.appendChild(wrapper);
     }
-    
+
     /**
      * ブロックハイライトを更新（リサイズ時用）
      * @returns {void}
@@ -494,43 +526,43 @@ const BlockMarkerGenerator = (() => {
     function updateBlockHighlight() {
         const wrapper = document.querySelector('.block-highlight-wrapper');
         if (!wrapper) return;
-        
+
         const blockIndex = parseInt(wrapper.dataset.blockIndex, 10);
         if (isNaN(blockIndex) || blockIndex < 0 || blockIndex >= AppState.diffBlocks.length) {
             return;
         }
-        
+
         const block = AppState.diffBlocks[blockIndex];
         if (!block || !block.rows || block.rows.length === 0) {
             return;
         }
-        
+
         const firstRow = block.rows[0];
         const lastRow = block.rows[block.rows.length - 1];
         const table = firstRow.closest('table');
         if (!table) return;
-        
+
         const container = table.parentElement;
         if (!container) return;
-        
+
         const tableRect = table.getBoundingClientRect();
         const containerRect = container.getBoundingClientRect();
         const firstRowRect = firstRow.getBoundingClientRect();
         const lastRowRect = lastRow.getBoundingClientRect();
-        
+
         const top = firstRowRect.top - containerRect.top + container.scrollTop;
         const height = lastRowRect.bottom - firstRowRect.top;
         const left = tableRect.left - containerRect.left;
         const width = tableRect.width;
-        
+
         wrapper.style.left = `${left}px`;
         wrapper.style.top = `${top}px`;
         wrapper.style.width = `${width}px`;
         wrapper.style.height = `${height}px`;
-        
+
         Logger.log('✅ ブロックハイライトの位置・サイズを更新');
     }
-    
+
     /**
      * ブロック情報表示を更新
      * @private
@@ -542,31 +574,31 @@ const BlockMarkerGenerator = (() => {
             CSSManager.showElement(AppState.elements.diffInfo, 'info-visible', 'info-hidden');
             return;
         }
-        
+
         CSSManager.showElement(AppState.elements.diffInfo, 'info-visible', 'info-hidden');
-        
-        const current = (AppState.currentDiffIndex >= 0 && 
-                        AppState.currentDiffIndex < AppState.diffBlocks.length) 
-            ? AppState.currentDiffIndex + 1 
-            : 0;
-        
+
+        const current =
+            AppState.currentDiffIndex >= 0 && AppState.currentDiffIndex < AppState.diffBlocks.length
+                ? AppState.currentDiffIndex + 1
+                : 0;
+
         AppState.elements.diffInfo.textContent = `差分: ${current} / ${AppState.diffBlocks.length}`;
     }
-    
+
     /**
      * ブロックマーカーをクリア
      * @private
      * @returns {void}
      */
     function clearBlockMarkers() {
-        const paneLeft  = AppState.elements.locationPaneLeft;
+        const paneLeft = AppState.elements.locationPaneLeft;
         const paneRight = AppState.elements.locationPaneRight;
 
         // イベント委譲モデルのため、マーカー要素への個別リスナー登録は行っていない。
         // DOM から remove() するだけでよい。
-        [paneLeft, paneRight].forEach(pane => {
+        [paneLeft, paneRight].forEach((pane) => {
             if (!pane) return;
-            pane.querySelectorAll('.block-marker').forEach(marker => marker.remove());
+            pane.querySelectorAll('.block-marker').forEach((marker) => marker.remove());
         });
 
         Logger.log('✅ Block markers cleared (left + right panes)');
@@ -577,7 +609,7 @@ const BlockMarkerGenerator = (() => {
      * @returns {void}
      */
     function cleanupDelegation() {
-        const paneLeft  = AppState.elements.locationPaneLeft;
+        const paneLeft = AppState.elements.locationPaneLeft;
         const paneRight = AppState.elements.locationPaneRight;
 
         if (!paneLeft && !paneRight) {
@@ -586,28 +618,28 @@ const BlockMarkerGenerator = (() => {
         }
 
         if (clickHandler) {
-            paneLeft?.removeEventListener('click',     clickHandler);
-            paneRight?.removeEventListener('click',    clickHandler);
+            paneLeft?.removeEventListener('click', clickHandler);
+            paneRight?.removeEventListener('click', clickHandler);
             clickHandler = null;
             Logger.log('✅ block-marker clickハンドラを削除しました');
         }
 
         if (keydownHandler) {
-            paneLeft?.removeEventListener('keydown',  keydownHandler);
+            paneLeft?.removeEventListener('keydown', keydownHandler);
             paneRight?.removeEventListener('keydown', keydownHandler);
             keydownHandler = null;
             Logger.log('✅ block-marker keydownハンドラを削除しました');
         }
 
         if (mouseoverHandler) {
-            paneLeft?.removeEventListener('mouseover',  mouseoverHandler);
+            paneLeft?.removeEventListener('mouseover', mouseoverHandler);
             paneRight?.removeEventListener('mouseover', mouseoverHandler);
             mouseoverHandler = null;
             Logger.log('✅ block-marker mouseoverハンドラを削除しました');
         }
 
         if (mouseoutHandler) {
-            paneLeft?.removeEventListener('mouseout',  mouseoutHandler);
+            paneLeft?.removeEventListener('mouseout', mouseoutHandler);
             paneRight?.removeEventListener('mouseout', mouseoutHandler);
             mouseoutHandler = null;
             Logger.log('✅ block-marker mouseoutハンドラを削除しました');
@@ -635,7 +667,7 @@ const BlockMarkerGenerator = (() => {
         jumpToBlock,
         updateBlockInfo,
         clearBlockMarkers,
-        setNavigation
+        setNavigation,
     };
 })();
 
