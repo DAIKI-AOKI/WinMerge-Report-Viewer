@@ -101,3 +101,94 @@ describe('BlockMarkerGenerator.cleanup() - 追加', () => {
         expect(paneLeft.querySelectorAll('.block-marker').length).toBe(0);
     });
 });
+
+// ========================================
+// マーカークリック委譲 (handleBlockMarkerClick)
+// ========================================
+describe('BlockMarkerGenerator - マーカークリック委譲', () => {
+    it('marker をクリックすると該当ブロックへジャンプする', () => {
+        const block = makeBlock(0, 2);
+        AppState.diffBlocks = [block];
+        BlockMarkerGenerator.cleanup();
+        BlockMarkerGenerator.generateBlockMarkers([], null);
+
+        const paneLeft = AppState.elements.locationPaneLeft;
+        const marker = document.createElement('div');
+        marker.classList.add('marker', 'block-marker');
+        marker.dataset.blockIndex = '0';
+        paneLeft.appendChild(marker);
+
+        marker.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+        expect(AppState.currentDiffIndex).toBe(0);
+    });
+
+    it('無効な index の marker をクリックしても例外が発生しない', () => {
+        AppState.diffBlocks = [makeBlock(0, 2)];
+        BlockMarkerGenerator.cleanup();
+        BlockMarkerGenerator.generateBlockMarkers([], null);
+
+        const paneLeft = AppState.elements.locationPaneLeft;
+        const marker = document.createElement('div');
+        marker.classList.add('marker', 'block-marker');
+        marker.dataset.blockIndex = '99';
+        paneLeft.appendChild(marker);
+
+        expect(() => marker.dispatchEvent(new MouseEvent('click', { bubbles: true }))).not.toThrow();
+        expect(AppState.currentDiffIndex).toBe(-1);
+    });
+});
+
+// ========================================
+// ホバー時のハイライト (mouseover/mouseout)
+// ========================================
+describe('BlockMarkerGenerator - ホバー時のハイライト', () => {
+    it('mouseover で左右両ペインの同じ index のマーカーに block-marker-hover が付く', () => {
+        BlockMarkerGenerator.cleanup();
+        BlockMarkerGenerator.generateBlockMarkers([], null);
+
+        const paneLeft = AppState.elements.locationPaneLeft;
+        const paneRight = AppState.elements.locationPaneRight;
+
+        const markerLeft = document.createElement('div');
+        markerLeft.classList.add('marker', 'block-marker');
+        markerLeft.dataset.blockIndex = '0';
+        paneLeft.appendChild(markerLeft);
+
+        const markerRight = document.createElement('div');
+        markerRight.classList.add('marker', 'block-marker');
+        markerRight.dataset.blockIndex = '0';
+        paneRight.appendChild(markerRight);
+
+        markerLeft.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+
+        expect(markerLeft.classList.contains('block-marker-hover')).toBe(true);
+        expect(markerRight.classList.contains('block-marker-hover')).toBe(true);
+    });
+
+    it('mouseout で block-marker-hover が外れる', () => {
+        BlockMarkerGenerator.cleanup();
+        BlockMarkerGenerator.generateBlockMarkers([], null);
+
+        const paneLeft = AppState.elements.locationPaneLeft;
+        const marker = document.createElement('div');
+        marker.classList.add('marker', 'block-marker', 'block-marker-hover');
+        marker.dataset.blockIndex = '0';
+        paneLeft.appendChild(marker);
+
+        marker.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }));
+
+        expect(marker.classList.contains('block-marker-hover')).toBe(false);
+    });
+});
+
+// ========================================
+// cleanupDelegation() - パネル不在時の警告
+// ========================================
+describe('BlockMarkerGenerator.cleanupDelegation() - パネル不在', () => {
+    it('locationPaneLeft/Right が両方とも存在しない場合は警告して早期リターンする', () => {
+        AppState.elements.locationPaneLeft = null;
+        AppState.elements.locationPaneRight = null;
+        expect(() => BlockMarkerGenerator.cleanupDelegation()).not.toThrow();
+    });
+});
