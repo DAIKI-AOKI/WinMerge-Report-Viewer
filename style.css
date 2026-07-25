@@ -225,7 +225,9 @@ body {
     border: 1px solid #bbb;
     border-radius: 6px;
     cursor: pointer;
-    transition: background-color 0.2s ease, border-color 0.2s ease;
+    transition:
+        background-color 0.2s ease,
+        border-color 0.2s ease;
     user-select: none;
 }
 
@@ -251,7 +253,7 @@ body {
 }
 
 #dropArea.drag-over {
-    border-color: #4CAF50;
+    border-color: #4caf50;
     background: #f0fff0;
     transform: scale(1.02);
 }
@@ -274,7 +276,7 @@ body {
 }
 
 #dropArea.drag-over .drop-icon {
-    color: #4CAF50;
+    color: #4caf50;
 }
 
 /* ========================================
@@ -508,7 +510,6 @@ table.diff td {
 }
 
 @keyframes float {
-
     0%,
     100% {
         transform: translateY(0);
@@ -551,7 +552,12 @@ table.diff td {
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.3) 50%, transparent 100%);
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.3) 50%,
+        transparent 100%
+    );
     animation: shimmer 1.5s infinite;
 }
 
@@ -602,7 +608,6 @@ table.diff td {
 }
 
 @keyframes shake {
-
     0%,
     100% {
         transform: translateX(0);
@@ -650,7 +655,7 @@ table.diff td {
 }
 
 @media screen and (max-width: 600px) {
-    body>*:not(#mobileWarning) {
+    body > *:not(#mobileWarning) {
         display: none !important;
     }
 
@@ -704,7 +709,6 @@ table.diff td {
    アクセシビリティ - アニメーション削減設定
    ======================================== */
 @media (prefers-reduced-motion: reduce) {
-
     .simple-progress-overlay,
     .simple-progress-container,
     .simple-progress-bar {
