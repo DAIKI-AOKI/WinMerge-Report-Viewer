@@ -192,3 +192,72 @@ describe('BlockMarkerGenerator.cleanupDelegation() - パネル不在', () => {
         expect(() => BlockMarkerGenerator.cleanupDelegation()).not.toThrow();
     });
 });
+
+// ========================================
+// generateBlockMarkers() - 実際のマーカー配置
+// (_placeBlockMarkers / _createBlockMarkerEl のカバー)
+// ========================================
+describe('BlockMarkerGenerator.generateBlockMarkers() - 実際のマーカー配置', () => {
+    it('scrollHeight/clientHeightが有効な場合、マーカーがDOMに配置される', async () => {
+        const block = makeBlock(0, 2);
+        block.leftColor = 'rgb(239, 203, 5)';
+        block.rightColor = 'rgb(239, 203, 5)';
+        AppState.diffBlocks = [block];
+
+        const diffContent = AppState.elements.diffContent;
+        const paneLeft = AppState.elements.locationPaneLeft;
+        const paneRight = AppState.elements.locationPaneRight;
+
+        // jsdomでは常に0を返すサイズ系プロパティを、意図的に上書きする
+        Object.defineProperty(diffContent, 'scrollHeight', { value: 1000, configurable: true });
+        Object.defineProperty(paneLeft, 'clientHeight', { value: 500, configurable: true });
+        Object.defineProperty(paneRight, 'clientHeight', { value: 500, configurable: true });
+
+        block.rows.forEach((row, i) => {
+            Object.defineProperty(row, 'offsetTop', { value: i * 20, configurable: true });
+            Object.defineProperty(row, 'offsetHeight', { value: 20, configurable: true });
+        });
+
+        BlockMarkerGenerator.cleanup();
+        BlockMarkerGenerator.generateBlockMarkers([block], diffContent);
+
+        // requestAnimationFrame の発火を待つ
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+        const markersLeft = paneLeft.querySelectorAll('.block-marker');
+        const markersRight = paneRight.querySelectorAll('.block-marker');
+
+        expect(markersLeft.length).toBe(1);
+        expect(markersRight.length).toBe(1);
+        expect(markersLeft[0].style.backgroundColor).toBeTruthy();
+        expect(markersLeft[0].getAttribute('role')).toBe('button');
+    });
+
+    it('block.leftColor が無い場合、左ペインにはマーカーが追加されない', async () => {
+        const block = makeBlock(0, 2);
+        block.leftColor = null;
+        block.rightColor = 'rgb(239, 203, 5)';
+        AppState.diffBlocks = [block];
+
+        const diffContent = AppState.elements.diffContent;
+        const paneLeft = AppState.elements.locationPaneLeft;
+        const paneRight = AppState.elements.locationPaneRight;
+
+        Object.defineProperty(diffContent, 'scrollHeight', { value: 1000, configurable: true });
+        Object.defineProperty(paneLeft, 'clientHeight', { value: 500, configurable: true });
+        Object.defineProperty(paneRight, 'clientHeight', { value: 500, configurable: true });
+
+        block.rows.forEach((row, i) => {
+            Object.defineProperty(row, 'offsetTop', { value: i * 20, configurable: true });
+            Object.defineProperty(row, 'offsetHeight', { value: 20, configurable: true });
+        });
+
+        BlockMarkerGenerator.cleanup();
+        BlockMarkerGenerator.generateBlockMarkers([block], diffContent);
+
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+        expect(paneLeft.querySelectorAll('.block-marker').length).toBe(0);
+        expect(paneRight.querySelectorAll('.block-marker').length).toBe(1);
+    });
+});
