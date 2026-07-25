@@ -1,7 +1,7 @@
 /**
  * TableProcessor - テーブル処理モジュール（IntersectionObserver メモリリーク対策版 + リサイズ対応）
  * 依存: config.js, state.js, utils.js
- * 
+ *
  * @fileoverview テーブルの加工と固定ヘッダー管理
  */
 
@@ -18,7 +18,7 @@ const TableProcessor = (() => {
      */
     function addRightBars(table) {
         const rows = table.querySelectorAll('tr');
-        rows.forEach(row => {
+        rows.forEach((row) => {
             const isHeaderRow = row.querySelector('th');
             const rightBarCell = document.createElement(isHeaderRow ? 'th' : 'td');
             rightBarCell.className = 'added-right-bar';
@@ -35,14 +35,14 @@ const TableProcessor = (() => {
     function setupFixedHeader(table) {
         const firstRow = table.querySelector('tr');
         if (!firstRow) return;
-        
+
         AppState.elements.fixedHeaderRow.innerHTML = '';
         firstRow.querySelectorAll('th').forEach((originalTh) => {
             const newTh = document.createElement('th');
             newTh.textContent = originalTh.textContent;
-            
+
             const allowedAttributes = ['class', 'colspan', 'rowspan'];
-            allowedAttributes.forEach(attrName => {
+            allowedAttributes.forEach((attrName) => {
                 if (originalTh.hasAttribute(attrName)) {
                     const attrValue = originalTh.getAttribute(attrName);
                     const sanitizedValue = attrValue
@@ -55,17 +55,17 @@ const TableProcessor = (() => {
                     }
                 }
             });
-            
+
             newTh.setAttribute('scope', 'col');
-            
-            Array.from(originalTh.attributes).forEach(attr => {
+
+            Array.from(originalTh.attributes).forEach((attr) => {
                 if (attr.name.startsWith('aria-') || attr.name.startsWith('data-')) {
                     let attrValue = attr.value;
                     const sanitizedValue = attrValue.replace(/[<>'"]/g, '').trim();
                     newTh.setAttribute(attr.name, sanitizedValue);
                 }
             });
-            
+
             AppState.elements.fixedHeaderRow.appendChild(newTh);
         });
     }
@@ -78,17 +78,20 @@ const TableProcessor = (() => {
     function updateFixedHeaderPosition(originalTable) {
         const fixedTable = AppState.elements.fixedHeader.querySelector('table');
         if (!originalTable || !fixedTable) return;
-        
+
         const tableRect = originalTable.getBoundingClientRect();
         CSSManager.setVariable('fixed-header-left', `${tableRect.left}px`);
         CSSManager.setVariable('fixed-header-width', `${tableRect.width}px`);
-        
+
         const originalThs = originalTable.querySelectorAll('tr:first-child th');
         const fixedThs = fixedTable.querySelectorAll('tr:first-child th');
-        
+
         originalThs.forEach((originalTh, index) => {
             if (!fixedThs[index]) return;
-            if (index === originalThs.length - 1 && originalTh.classList.contains('added-right-bar')) {
+            if (
+                index === originalThs.length - 1 &&
+                originalTh.classList.contains('added-right-bar')
+            ) {
                 fixedThs[index].style.width = `${CONFIG.RIGHT_BAR_WIDTH}px`;
             } else {
                 const thRect = originalTh.getBoundingClientRect();
@@ -99,7 +102,10 @@ const TableProcessor = (() => {
                 } else if (windowWidth <= 750) {
                     adjustedWidth = thRect.width - 17;
                 } else {
-                    adjustedWidth = Math.max(CONFIG.MIN_COLUMN_WIDTH, thRect.width - CONFIG.HEADER_ADJUSTMENT);
+                    adjustedWidth = Math.max(
+                        CONFIG.MIN_COLUMN_WIDTH,
+                        thRect.width - CONFIG.HEADER_ADJUSTMENT
+                    );
                 }
                 fixedThs[index].style.width = `${adjustedWidth}px`;
             }
@@ -116,10 +122,10 @@ const TableProcessor = (() => {
             try {
                 // ★メモリリーク対策1: すべての監視を解除
                 AppState.intersectionObserver.disconnect();
-                
+
                 // ★メモリリーク対策2: 参照をクリア
                 AppState.intersectionObserver = null;
-                
+
                 Logger.log('✅ IntersectionObserver cleaned up completely');
             } catch (error) {
                 Logger.warn('IntersectionObserver cleanup error:', error);
@@ -137,16 +143,16 @@ const TableProcessor = (() => {
     function setupIntersectionObserver() {
         // ★メモリリーク対策3: 既存の observer を完全にクリーンアップ
         cleanupIntersectionObserver();
-        
+
         try {
             // ★メモリリーク対策4: コールバック関数を変数に保存（デバッグ用）
             const observerCallback = (entries) => {
-                entries.forEach(entry => {
+                entries.forEach((entry) => {
                     if (entry.isIntersecting) {
                         // ヘッダー行が見えている → 固定ヘッダーを非表示
                         CSSManager.hideElement(
-                            AppState.elements.fixedHeader, 
-                            'fixed-header-visible', 
+                            AppState.elements.fixedHeader,
+                            'fixed-header-visible',
                             'fixed-header-hidden'
                         );
                         entry.target.style.visibility = 'visible';
@@ -156,8 +162,8 @@ const TableProcessor = (() => {
                         if (firstTable && entry.target === firstTable.querySelector('tr')) {
                             updateFixedHeaderPosition(firstTable);
                             CSSManager.showElement(
-                                AppState.elements.fixedHeader, 
-                                'fixed-header-visible', 
+                                AppState.elements.fixedHeader,
+                                'fixed-header-visible',
                                 'fixed-header-hidden'
                             );
                             entry.target.style.visibility = 'hidden';
@@ -165,19 +171,19 @@ const TableProcessor = (() => {
                     }
                 });
             };
-            
+
             const observerOptions = {
                 root: AppState.elements.diffContent,
                 rootMargin: `-${CONFIG.HEADER_VISIBILITY_THRESHOLD}px 0px 0px 0px`,
-                threshold: 0
+                threshold: 0,
             };
-            
+
             // ★メモリリーク対策5: 新しい observer を作成
             AppState.intersectionObserver = new IntersectionObserver(
                 observerCallback,
                 observerOptions
             );
-            
+
             // ★メモリリーク対策6: 監視対象を登録
             const firstTable = AppState.elements.viewer.querySelector('table');
             if (firstTable) {
@@ -193,37 +199,36 @@ const TableProcessor = (() => {
                 Logger.warn('Table not found for IntersectionObserver');
                 cleanupIntersectionObserver();
             }
-            
+
             // ★修正: ウィンドウリサイズ時に固定ヘッダーの幅を更新
             setupResizeHandler(firstTable);
-            
         } catch (error) {
             Logger.error('IntersectionObserver setup failed:', error);
             // エラーが発生した場合は observer をクリーンアップ
             cleanupIntersectionObserver();
         }
     }
-    
+
     function setupResizeHandler(table) {
         if (!table) return;
-        
+
         // 既存のリサイズハンドラーをクリーンアップ
         if (AppState.eventHandlers.debouncedResize) {
             window.removeEventListener('resize', AppState.eventHandlers.debouncedResize);
             AppState.eventHandlers.debouncedResize = null;
         }
-        
+
         if (AppState.eventHandlers.resizeTimeout) {
             clearTimeout(AppState.eventHandlers.resizeTimeout);
             AppState.eventHandlers.resizeTimeout = null;
         }
-        
+
         // デバウンス付きリサイズハンドラー
         AppState.eventHandlers.debouncedResize = () => {
             if (AppState.eventHandlers.resizeTimeout) {
                 clearTimeout(AppState.eventHandlers.resizeTimeout);
             }
-            
+
             AppState.eventHandlers.resizeTimeout = setTimeout(() => {
                 // 固定ヘッダーが表示されている場合のみ更新
                 const fixedHeader = AppState.elements.fixedHeader;
@@ -234,7 +239,7 @@ const TableProcessor = (() => {
                         Logger.log('✅ 固定ヘッダーの幅をリサイズに合わせて更新');
                     }
                 }
-                
+
                 // ブロックハイライト枠の位置・サイズを更新
                 // markerResizeCallback はブロックモード確立後に file-handler.js が登録する
                 if (typeof AppState.eventHandlers.markerResizeCallback === 'function') {
@@ -242,7 +247,7 @@ const TableProcessor = (() => {
                 }
             }, CONFIG.RESIZE_DEBOUNCE_DELAY);
         };
-        
+
         window.addEventListener('resize', AppState.eventHandlers.debouncedResize);
         Logger.log('✅ リサイズハンドラーを設定しました');
     }
@@ -258,14 +263,16 @@ const TableProcessor = (() => {
     function _getTdBgColor(td) {
         function hexToRgb(hex) {
             const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-            return r ? { r: parseInt(r[1],16), g: parseInt(r[2],16), b: parseInt(r[3],16) } : null;
+            return r
+                ? { r: parseInt(r[1], 16), g: parseInt(r[2], 16), b: parseInt(r[3], 16) }
+                : null;
         }
         function isNeutral(r, g, b) {
             // 閾値 240: WinMerge の最も薄い差分色 rgb(241,226,173) の最小値が 173 であり、
             // 白・薄グレー（r,g,b すべて 240 以上）とは十分に区別できる。
             // ⚠️ CONFIG.DIFF_COLOR_MAP の色を変更する場合は、最も薄い色の最小チャンネル値が
             //    240 を超えないことを確認すること。
-            return (r >= 240 && g >= 240 && b >= 240);
+            return r >= 240 && g >= 240 && b >= 240;
         }
         // ① インラインスタイルの HEX（file:// 環境対応）
         const inline = td.style.backgroundColor;
@@ -278,7 +285,9 @@ const TableProcessor = (() => {
         if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') {
             const m = bg.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
             if (m) {
-                const r = parseInt(m[1]), g = parseInt(m[2]), b = parseInt(m[3]);
+                const r = parseInt(m[1]),
+                    g = parseInt(m[2]),
+                    b = parseInt(m[3]);
                 if (!isNeutral(r, g, b)) return bg;
             }
         }
@@ -305,7 +314,7 @@ const TableProcessor = (() => {
     function getRowColors(row) {
         // added-right-bar を除いた全 td を取得
         const allTds = Array.from(row.querySelectorAll('td')).filter(
-            td => !td.classList.contains('added-right-bar')
+            (td) => !td.classList.contains('added-right-bar')
         );
         const n = allTds.length;
 
@@ -323,14 +332,20 @@ const TableProcessor = (() => {
         let leftColor = null;
         for (let i = 0; i < half; i++) {
             const c = _getTdBgColor(allTds[i]);
-            if (c) { leftColor = c; break; }
+            if (c) {
+                leftColor = c;
+                break;
+            }
         }
 
         // 右半分の中から有色 td を探す（新ファイル側）
         let rightColor = null;
         for (let i = half; i < n; i++) {
             const c = _getTdBgColor(allTds[i]);
-            if (c) { rightColor = c; break; }
+            if (c) {
+                rightColor = c;
+                break;
+            }
         }
 
         return { left: leftColor, right: rightColor };

@@ -1,8 +1,8 @@
 /**
  * js/progress-indicator.js - プログレスインジケーター
- * 
+ *
  * 依存関係: なし（独立したモジュール）
- * 
+ *
  * @fileoverview ファイル処理中のプログレス表示を管理するクラス
  */
 
@@ -17,7 +17,7 @@
 /**
  * プログレスインジケータークラス
  * ファイル処理中の進捗状況を視覚的に表示
- * 
+ *
  * @class ProgressIndicator
  */
 class ProgressIndicator {
@@ -27,25 +27,25 @@ class ProgressIndicator {
     constructor() {
         /** @type {HTMLElement|null} オーバーレイ要素 */
         this.overlay = null;
-        
+
         /** @type {HTMLElement|null} プログレスバー要素 */
         this.progressBar = null;
-        
+
         /** @type {HTMLElement|null} ステータステキスト要素 */
         this.statusText = null;
-        
+
         /** @type {HTMLElement|null} パーセンテージテキスト要素 */
         this.percentText = null;
-        
+
         /** @type {number|null} hide() の遅延タイムアウトID（フェードアウト開始まで） */
         this.hideTimeout = null;
-        
+
         /** @type {number|null} transitionend 未発火時のフォールバックタイムアウトID */
         this.fallbackTimeout = null;
-        
+
         /** @type {Function|null} transitionend イベントハンドラの参照 */
         this.transitionEndHandler = null;
-        
+
         /** @type {Object.<string, ProcessingStep>} 処理ステップの定義 */
         this.steps = {
             read: { label: 'ファイル読み込み', range: [0, 20] },
@@ -53,7 +53,7 @@ class ProgressIndicator {
             parse: { label: 'DOM解析', range: [40, 50] },
             detect: { label: '差分検出', range: [50, 70] },
             marker: { label: 'マーカー生成', range: [70, 90] },
-            render: { label: '表示準備', range: [90, 100] }
+            render: { label: '表示準備', range: [90, 100] },
         };
     }
 
@@ -101,7 +101,7 @@ class ProgressIndicator {
     show(title = '処理中...') {
         // 再表示時に前回の hide() タイムアウトが残っていればキャンセル
         this.clearTimeouts();
-        
+
         if (!this.overlay) {
             this.createOverlay();
         }
@@ -161,7 +161,7 @@ class ProgressIndicator {
         }
 
         const [start, end] = stepData.range;
-        const progress = start + ((end - start) * substep / 100);
+        const progress = start + ((end - start) * substep) / 100;
 
         this.update(progress);
 
@@ -180,18 +180,21 @@ class ProgressIndicator {
      */
     hide(delay = 300) {
         if (!this.overlay) return;
-        
+
         this.clearTimeouts();
-        
+
         this.hideTimeout = setTimeout(() => {
             if (!this.overlay) return;
-            
+
             this.overlay.classList.remove('active');
-            
+
             this.transitionEndHandler = () => {
                 if (this.overlay) {
                     if (this.transitionEndHandler) {
-                        this.overlay.removeEventListener('transitionend', this.transitionEndHandler);
+                        this.overlay.removeEventListener(
+                            'transitionend',
+                            this.transitionEndHandler
+                        );
                         this.transitionEndHandler = null;
                     }
                     if (this.overlay.parentNode) {
@@ -200,9 +203,9 @@ class ProgressIndicator {
                     this.cleanup();
                 }
             };
-            
+
             this.overlay.addEventListener('transitionend', this.transitionEndHandler);
-            
+
             // transitionend が発火しない場合（アニメーション無効環境など）のフォールバック。
             // hideTimeout とは別変数で管理することで clearTimeouts() が両方を確実にキャンセルできる。
             this.fallbackTimeout = setTimeout(() => {
@@ -255,13 +258,13 @@ class ProgressIndicator {
     cleanup() {
         // hideTimeout と fallbackTimeout を両方クリア
         this.clearTimeouts();
-        
+
         // transitionend リスナーを削除
         if (this.overlay && this.transitionEndHandler) {
             this.overlay.removeEventListener('transitionend', this.transitionEndHandler);
             this.transitionEndHandler = null;
         }
-        
+
         // すべての DOM 参照をクリア
         this.overlay = null;
         this.progressBar = null;

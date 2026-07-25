@@ -1,9 +1,9 @@
 /**
  * WinMerge Report Viewer - 状態管理
- * 
+ *
  * アプリケーション状態の管理とログ出力
  * 依存: なし
- * 
+ *
  * @fileoverview アプリケーション全体の状態管理とロギング機能
  */
 
@@ -66,34 +66,34 @@ const AppState = {
         /** @type {Function|null} リサイズ時のミニマップマーカー再配置コールバック */
         markerResizeCallback: null,
     },
-    
+
     /** @type {DOMElements|null} DOM要素への参照 */
     elements: null,
-    
+
     /** @type {HTMLStyleElement|null} インポートされたスタイル要素 */
     importedStyleElem: null,
-    
+
     /** @type {boolean} ファイル処理中フラグ */
     isProcessing: false,
-    
+
     /** @type {DiffBlock[]} 差分ブロック情報の配列 */
     diffBlocks: [],
-    
+
     /** @type {number} 現在の差分インデックス */
     currentDiffIndex: -1,
-    
+
     /** @type {boolean} 差分へのナビゲーション中フラグ */
     isNavigatingToDiff: false,
-    
+
     /** @type {boolean} トップへスクロール中フラグ */
     isScrollingToTop: false,
-    
+
     /** @type {IntersectionObserver|null} Intersection Observer インスタンス */
     intersectionObserver: null,
-    
+
     /** @type {Timers} タイマー管理 */
     timers: {
-        memoryMonitor: null
+        memoryMonitor: null,
     },
 
     /**
@@ -116,7 +116,7 @@ const AppState = {
             diffInfo: document.getElementById('diffInfo'),
             fixedHeader: document.getElementById('fixedHeader'),
             fixedHeaderRow: document.getElementById('fixedHeaderRow'),
-            toolHeader: document.getElementById('toolHeader')
+            toolHeader: document.getElementById('toolHeader'),
         };
     },
 
@@ -127,7 +127,7 @@ const AppState = {
      * @returns {void}
      */
     cleanupTimers() {
-        Object.keys(this.timers).forEach(key => {
+        Object.keys(this.timers).forEach((key) => {
             if (this.timers[key]) {
                 clearInterval(this.timers[key]);
                 this.timers[key] = null;
@@ -146,12 +146,14 @@ const AppState = {
         this.isNavigatingToDiff = false;
         // 差分ブロックのクリーンアップ（rows内の<tr>参照を解放してGCを促す）
         if (Array.isArray(this.diffBlocks)) {
-            this.diffBlocks.forEach(block => {
+            this.diffBlocks.forEach((block) => {
                 if (block && typeof block === 'object') {
                     if (Array.isArray(block.rows)) {
                         block.rows.length = 0;
                     }
-                    Object.keys(block).forEach(key => { block[key] = null; });
+                    Object.keys(block).forEach((key) => {
+                        block[key] = null;
+                    });
                 }
             });
             this.diffBlocks.length = 0;
@@ -216,7 +218,7 @@ const AppState = {
         } catch (error) {
             Logger.error('Cleanup event handlers error:', error);
         }
-    }
+    },
 };
 
 /**
@@ -235,11 +237,13 @@ const Logger = {
      * @returns {boolean} デバッグモードが有効な場合true
      */
     get enabled() {
-        return window.location.hostname === 'localhost' ||
+        return (
+            window.location.hostname === 'localhost' ||
             window.location.hostname === '127.0.0.1' ||
-            window.location.search.includes('debug=true');
+            window.location.search.includes('debug=true')
+        );
     },
-    
+
     /**
      * デバッグログを出力（デバッグモード時のみ）
      * @param {...*} args - 出力する引数
@@ -248,7 +252,7 @@ const Logger = {
     log(...args) {
         if (this.enabled) console.log(...args);
     },
-    
+
     /**
      * 警告ログを出力
      * @param {...*} args - 出力する引数
@@ -257,7 +261,7 @@ const Logger = {
     warn(...args) {
         console.warn(...args);
     },
-    
+
     /**
      * エラーログを出力
      * @param {...*} args - 出力する引数
@@ -265,7 +269,7 @@ const Logger = {
      */
     error(...args) {
         console.error(...args);
-    }
+    },
 };
 
 export { AppState, Logger };

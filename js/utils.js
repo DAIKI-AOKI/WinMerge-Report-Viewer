@@ -1,6 +1,6 @@
 /**
  * WinMerge Report Viewer - ユーティリティ（改善版）
- * 
+ *
  * 汎用的なユーティリティ関数とCSS管理
  * 依存: config.js, state.js
  */
@@ -20,7 +20,7 @@ const Utils = {
         const sizes = ['B', 'KB', 'MB', 'GB'];
         if (bytes === 0) return '0 B';
         const i = Math.floor(Math.log(bytes) / Math.log(1024));
-        return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+        return Math.round((bytes / Math.pow(1024, i)) * 100) / 100 + ' ' + sizes[i];
     },
 
     /**
@@ -38,7 +38,7 @@ const Utils = {
      * 非同期待機用のスリープ関数
      */
     sleep(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
+        return new Promise((resolve) => setTimeout(resolve, ms));
     },
 
     /**
@@ -68,45 +68,45 @@ const Utils = {
      */
     computeTableHash(table) {
         if (!table) return null;
-        
+
         const rows = table.querySelectorAll('tr');
         const rowCount = rows.length;
-        
+
         if (rowCount === 0) return 0;
-        
+
         // ========================================
         // FNV-1a ハッシュの定数
         // ========================================
         const FNV_OFFSET_BASIS = 2166136261;
         const FNV_PRIME = 16777619;
-        
+
         let hash = FNV_OFFSET_BASIS;
-        
+
         // ========================================
         // ステップ1: 基本構造情報をハッシュに含める
         // ========================================
-        
+
         // 行数をハッシュ化
         hash ^= rowCount;
         hash = Math.imul(hash, FNV_PRIME);
-        
+
         // 列数（最初の行から取得）
         const firstRow = rows[0];
         const colCount = firstRow ? firstRow.querySelectorAll('td, th').length : 0;
         hash ^= colCount;
         hash = Math.imul(hash, FNV_PRIME);
-        
+
         // ========================================
         // ステップ2: サンプリング戦略（改善版）
         // ========================================
         const SAMPLE_SIZE = 10;
         const sampleIndices = new Set();
-        
+
         // 最初の10行を必ずサンプリング
         for (let i = 0; i < Math.min(SAMPLE_SIZE, rowCount); i++) {
             sampleIndices.add(i);
         }
-        
+
         // 均等分散サンプリング（行数が多い場合）
         if (rowCount > SAMPLE_SIZE * 3) {
             // 全体を SAMPLE_SIZE 個のセグメントに分割し、各セグメントの中央をサンプリング
@@ -127,44 +127,45 @@ const Utils = {
                 }
             }
         }
-        
+
         // 最後の10行を必ずサンプリング
         for (let i = Math.max(0, rowCount - SAMPLE_SIZE); i < rowCount; i++) {
             sampleIndices.add(i);
         }
-        
+
         const indicesToProcess = Array.from(sampleIndices).sort((a, b) => a - b);
-        
-        Logger.log(`テーブルハッシュ計算: 全${rowCount}行×${colCount}列中${indicesToProcess.length}行をサンプリング`);
-        
+
+        Logger.log(
+            `テーブルハッシュ計算: 全${rowCount}行×${colCount}列中${indicesToProcess.length}行をサンプリング`
+        );
+
         // ========================================
         // ステップ3: FNV-1a ハッシュでサンプル行を処理
         // ========================================
         for (const idx of indicesToProcess) {
             const row = rows[idx];
             if (!row) continue;
-            
+
             // 各行のテキストを取得（最初の100文字のみ）
             const text = row.textContent.trim().substring(0, 100);
-            
+
             // FNV-1a ハッシュ: 文字ごとに処理
             for (let i = 0; i < text.length; i++) {
                 hash ^= text.charCodeAt(i);
                 hash = Math.imul(hash, FNV_PRIME);
             }
-            
+
             // ★改善ポイント: 行インデックスもハッシュに含める
             // これにより、同じ内容でも位置が違えば異なるハッシュになる
             hash ^= idx;
             hash = Math.imul(hash, FNV_PRIME);
         }
-        
+
         // ========================================
         // ステップ4: 32ビット符号なし整数に正規化
         // ========================================
         return hash >>> 0;
     },
-
 };
 
 /**
@@ -177,21 +178,21 @@ const CSSManager = {
     setVariable(name, value) {
         document.documentElement.style.setProperty(`--${name}`, value);
     },
-    
+
     /**
      * CSS変数を取得
      */
     getVariable(name) {
         return getComputedStyle(document.documentElement).getPropertyValue(`--${name}`);
     },
-    
+
     /**
      * 要素を表示
      */
     showElement(element, visibleClass, hiddenClass) {
         if (!visibleClass || !hiddenClass) {
             const classList = Array.from(element.classList);
-            hiddenClass = classList.find(c => c.includes('-hidden'));
+            hiddenClass = classList.find((c) => c.includes('-hidden'));
             if (hiddenClass) {
                 visibleClass = hiddenClass.replace('-hidden', '-visible');
             } else {
@@ -202,14 +203,14 @@ const CSSManager = {
         element.classList.remove(hiddenClass);
         element.classList.add(visibleClass);
     },
-    
+
     /**
      * 要素を非表示
      */
     hideElement(element, visibleClass, hiddenClass) {
         if (!visibleClass || !hiddenClass) {
             const classList = Array.from(element.classList);
-            visibleClass = classList.find(c => c.includes('-visible'));
+            visibleClass = classList.find((c) => c.includes('-visible'));
             if (visibleClass) {
                 hiddenClass = visibleClass.replace('-visible', '-hidden');
             } else {
@@ -219,7 +220,7 @@ const CSSManager = {
         }
         element.classList.remove(visibleClass);
         element.classList.add(hiddenClass);
-    }
+    },
 };
 
 export { Utils, CSSManager };

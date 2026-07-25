@@ -2,7 +2,7 @@
  * EventManager - イベント管理モジュール（メモリリーク完全対策版）
  * ドラッグ&ドロップ、その他のイベントハンドラ
  * 依存: config.js, state.js, file-handler.js, navigation.js
- * 
+ *
  * @fileoverview イベントリスナーの管理とドラッグ&ドロップ処理
  */
 
@@ -30,7 +30,7 @@ const EventManager = (() => {
         dragPreventDefaults: null,
         dragHighlight: null,
         dragUnhighlight: null,
-        drop: null
+        drop: null,
     };
 
     /**
@@ -88,23 +88,23 @@ const EventManager = (() => {
      */
     function initializeEventListeners() {
         const elements = AppState.elements;
-        
+
         // ★修正: 既存のリスナーを先に削除（二重登録を防止）
         cleanup();
-        
+
         // ★メモリリーク対策: ハンドラを変数に保存（クリーンアップ時に使用）
-        
+
         // ファイル選択
         eventHandlers.fileInputChange = (e) => {
             const file = e.target.files[0];
             if (file) FileHandler.process(file);
         };
         elements.fileInput.addEventListener('change', eventHandlers.fileInputChange);
-        
+
         // リセットボタン
         eventHandlers.resetButtonClick = () => Navigation.resetInterface();
         elements.resetButton.addEventListener('click', eventHandlers.resetButtonClick);
-        
+
         // トップへスクロールボタン
         eventHandlers.scrollTopButtonClick = () => {
             AppState.isScrollingToTop = true;
@@ -125,7 +125,7 @@ const EventManager = (() => {
             }, CONFIG.SCROLL_TO_TOP_RESET_DELAY_MS);
         };
         elements.scrollTopButton.addEventListener('click', eventHandlers.scrollTopButtonClick);
-        
+
         // ドロップエリアクリック
         eventHandlers.dropAreaClick = () => {
             if (!AppState.isProcessing) {
@@ -133,27 +133,27 @@ const EventManager = (() => {
             }
         };
         elements.dropArea.addEventListener('click', eventHandlers.dropAreaClick);
-        
+
         // ドラッグ&ドロップイベント
         eventHandlers.dragPreventDefaults = preventDefaults;
-        DRAG_EVENTS.forEach(eventName => {
+        DRAG_EVENTS.forEach((eventName) => {
             elements.dropArea.addEventListener(eventName, eventHandlers.dragPreventDefaults, false);
             document.body.addEventListener(eventName, eventHandlers.dragPreventDefaults, false);
         });
-        
+
         eventHandlers.dragHighlight = highlight;
-        HIGHLIGHT_EVENTS.forEach(eventName => {
+        HIGHLIGHT_EVENTS.forEach((eventName) => {
             elements.dropArea.addEventListener(eventName, eventHandlers.dragHighlight, false);
         });
-        
+
         eventHandlers.dragUnhighlight = unhighlight;
-        UNHIGHLIGHT_EVENTS.forEach(eventName => {
+        UNHIGHLIGHT_EVENTS.forEach((eventName) => {
             elements.dropArea.addEventListener(eventName, eventHandlers.dragUnhighlight, false);
         });
-        
+
         eventHandlers.drop = handleDrop;
         elements.dropArea.addEventListener('drop', eventHandlers.drop, false);
-        
+
         Logger.log('✅ Event listeners initialized with cleanup support');
     }
 
@@ -163,74 +163,93 @@ const EventManager = (() => {
      */
     function cleanup() {
         const elements = AppState.elements;
-        
+
         if (!elements) {
             Logger.warn('Elements not found during EventManager cleanup');
             return;
         }
-        
+
         Logger.log('=== EventManager クリーンアップ開始 ===');
-        
+
         // ファイル選択
         if (eventHandlers.fileInputChange && elements.fileInput) {
             elements.fileInput.removeEventListener('change', eventHandlers.fileInputChange);
             eventHandlers.fileInputChange = null;
             Logger.log('✅ fileInput changeハンドラを削除');
         }
-        
+
         // リセットボタン
         if (eventHandlers.resetButtonClick && elements.resetButton) {
             elements.resetButton.removeEventListener('click', eventHandlers.resetButtonClick);
             eventHandlers.resetButtonClick = null;
             Logger.log('✅ resetButton clickハンドラを削除');
         }
-        
+
         // トップへスクロールボタン
         if (eventHandlers.scrollTopButtonClick && elements.scrollTopButton) {
-            elements.scrollTopButton.removeEventListener('click', eventHandlers.scrollTopButtonClick);
+            elements.scrollTopButton.removeEventListener(
+                'click',
+                eventHandlers.scrollTopButtonClick
+            );
             eventHandlers.scrollTopButtonClick = null;
             Logger.log('✅ scrollTopButton clickハンドラを削除');
         }
-        
+
         // ドロップエリアクリック
         if (eventHandlers.dropAreaClick && elements.dropArea) {
             elements.dropArea.removeEventListener('click', eventHandlers.dropAreaClick);
             eventHandlers.dropAreaClick = null;
             Logger.log('✅ dropArea clickハンドラを削除');
         }
-        
+
         // ドラッグ&ドロップイベント
         if (eventHandlers.dragPreventDefaults && elements.dropArea) {
-            DRAG_EVENTS.forEach(eventName => {
-                elements.dropArea.removeEventListener(eventName, eventHandlers.dragPreventDefaults, false);
-                document.body.removeEventListener(eventName, eventHandlers.dragPreventDefaults, false);
+            DRAG_EVENTS.forEach((eventName) => {
+                elements.dropArea.removeEventListener(
+                    eventName,
+                    eventHandlers.dragPreventDefaults,
+                    false
+                );
+                document.body.removeEventListener(
+                    eventName,
+                    eventHandlers.dragPreventDefaults,
+                    false
+                );
             });
             eventHandlers.dragPreventDefaults = null;
             Logger.log('✅ drag preventDefaults ハンドラを削除');
         }
-        
+
         if (eventHandlers.dragHighlight && elements.dropArea) {
-            HIGHLIGHT_EVENTS.forEach(eventName => {
-                elements.dropArea.removeEventListener(eventName, eventHandlers.dragHighlight, false);
+            HIGHLIGHT_EVENTS.forEach((eventName) => {
+                elements.dropArea.removeEventListener(
+                    eventName,
+                    eventHandlers.dragHighlight,
+                    false
+                );
             });
             eventHandlers.dragHighlight = null;
             Logger.log('✅ drag highlight ハンドラを削除');
         }
-        
+
         if (eventHandlers.dragUnhighlight && elements.dropArea) {
-            UNHIGHLIGHT_EVENTS.forEach(eventName => {
-                elements.dropArea.removeEventListener(eventName, eventHandlers.dragUnhighlight, false);
+            UNHIGHLIGHT_EVENTS.forEach((eventName) => {
+                elements.dropArea.removeEventListener(
+                    eventName,
+                    eventHandlers.dragUnhighlight,
+                    false
+                );
             });
             eventHandlers.dragUnhighlight = null;
             Logger.log('✅ drag unhighlight ハンドラを削除');
         }
-        
+
         if (eventHandlers.drop && elements.dropArea) {
             elements.dropArea.removeEventListener('drop', eventHandlers.drop, false);
             eventHandlers.drop = null;
             Logger.log('✅ drop ハンドラを削除');
         }
-        
+
         Logger.log('=== EventManager クリーンアップ完了 ===');
     }
 
@@ -241,7 +260,7 @@ const EventManager = (() => {
         preventDefaults,
         highlight,
         unhighlight,
-        handleDrop
+        handleDrop,
     };
 })();
 

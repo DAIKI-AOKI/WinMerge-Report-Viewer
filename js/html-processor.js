@@ -1,9 +1,9 @@
 /**
  * WinMerge Report Viewer - HTML処理
- * 
+ *
  * HTMLのサニタイゼーションとスタイル処理
  * 依存: config.js, state.js, errors.js, table-processor.js
- * 
+ *
  * @fileoverview HTMLの安全な処理とスタイルインポート
  */
 
@@ -37,7 +37,7 @@ const HTMLProcessor = {
             }
 
             const allElements = Array.from(doc.querySelectorAll('*'));
-            allElements.forEach(el => {
+            allElements.forEach((el) => {
                 if (!el || !el.tagName || !el.parentNode) return;
 
                 // 許可されていないタグを削除（styleタグは許可）
@@ -46,10 +46,16 @@ const HTMLProcessor = {
                         const parent = el.parentNode;
                         const children = Array.from(el.childNodes);
 
-                        if (parent.nodeType === Node.ELEMENT_NODE || parent.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
-                            children.forEach(child => {
+                        if (
+                            parent.nodeType === Node.ELEMENT_NODE ||
+                            parent.nodeType === Node.DOCUMENT_FRAGMENT_NODE
+                        ) {
+                            children.forEach((child) => {
                                 try {
-                                    if (child.nodeType === Node.TEXT_NODE || child.nodeType === Node.ELEMENT_NODE) {
+                                    if (
+                                        child.nodeType === Node.TEXT_NODE ||
+                                        child.nodeType === Node.ELEMENT_NODE
+                                    ) {
                                         parent.insertBefore(child, el);
                                     }
                                 } catch {
@@ -70,11 +76,14 @@ const HTMLProcessor = {
             });
 
             // 危険な属性を削除（onclickなど）
-            doc.querySelectorAll('*').forEach(el => {
+            doc.querySelectorAll('*').forEach((el) => {
                 if (el && el.attributes) {
-                    Array.from(el.attributes).forEach(attr => {
+                    Array.from(el.attributes).forEach((attr) => {
                         if (attr && attr.name) {
-                            if (attr.name.startsWith('on') || (attr.value && attr.value.toLowerCase().includes('javascript:'))) {
+                            if (
+                                attr.name.startsWith('on') ||
+                                (attr.value && attr.value.toLowerCase().includes('javascript:'))
+                            ) {
                                 el.removeAttribute(attr.name);
                             }
                         }
@@ -116,11 +125,11 @@ const HTMLProcessor = {
     importStyles(doc) {
         const styleNodes = doc.querySelectorAll('style');
         if (!styleNodes.length) return;
-        
+
         AppState.importedStyleElem = document.createElement('style');
         AppState.importedStyleElem.setAttribute('data-imported', 'true');
         let css = '';
-        styleNodes.forEach(s => {
+        styleNodes.forEach((s) => {
             let styleContent = s.textContent || '';
             // 念のため危険なCSS構文を除去
             styleContent = styleContent
@@ -163,7 +172,7 @@ const HTMLProcessor = {
             AppState.importedStyleElem.parentNode.removeChild(AppState.importedStyleElem);
             AppState.importedStyleElem = null;
         }
-    }
+    },
 };
 
 export { HTMLProcessor };

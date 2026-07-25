@@ -1,9 +1,9 @@
 /**
  * WinMerge Report Viewer - UI制御 (改善版 v6.1)
- * 
+ *
  * ユーザーインターフェースの表示制御
  * 依存: config.js, state.js, utils.js
- * 
+ *
  * @fileoverview UI要素の表示・非表示とメッセージ管理
  */
 
@@ -52,30 +52,30 @@ const UI = {
      */
     showFileInfo(file) {
         AppState.elements.dropArea.style.display = 'none';
-        
+
         // ★改善: UI_CONSTANTS.CONTROL_BUTTONS → CONFIG.CONTROL_BUTTONS
-        CONFIG.CONTROL_BUTTONS.forEach(id => {
+        CONFIG.CONTROL_BUTTONS.forEach((id) => {
             CSSManager.showElement(AppState.elements[id]);
         });
-        
+
         const fileInfoDiv = document.createElement('div');
         fileInfoDiv.className = 'file-info';
-        
+
         const filename = document.createElement('strong');
         filename.textContent = 'ファイル名: ';
         const filenameValue = document.createElement('span');
         filenameValue.textContent = Utils.truncateFilename(file.name);
-        
+
         const filesize = document.createElement('strong');
         filesize.textContent = 'サイズ: ';
         const filesizeValue = document.createElement('span');
         filesizeValue.textContent = Utils.formatFileSize(file.size);
-        
+
         const lastModified = document.createElement('strong');
         lastModified.textContent = '最終更新: ';
         const lastModifiedValue = document.createElement('span');
         lastModifiedValue.textContent = new Date(file.lastModified).toLocaleString('ja-JP');
-        
+
         fileInfoDiv.appendChild(filename);
         fileInfoDiv.appendChild(filenameValue);
         fileInfoDiv.appendChild(document.createElement('br'));
@@ -84,7 +84,7 @@ const UI = {
         fileInfoDiv.appendChild(document.createElement('br'));
         fileInfoDiv.appendChild(lastModified);
         fileInfoDiv.appendChild(lastModifiedValue);
-        
+
         AppState.elements.viewer.innerHTML = '';
         AppState.elements.viewer.appendChild(fileInfoDiv);
     },
@@ -101,7 +101,7 @@ const UI = {
         } catch (error) {
             Logger.error('Clear viewer error:', error);
         }
-    }
+    },
 };
 
 export { UI };

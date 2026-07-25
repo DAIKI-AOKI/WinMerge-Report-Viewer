@@ -1,15 +1,20 @@
 /**
  * FileHandler - ファイル処理モジュール（エラーハンドリング改善版）
- * 依存: config.js, state.js, utils.js, errors.js, error-handler.js, ui.js, 
- *       html-processor.js, table-processor.js, diff-detector.js, navigation.js, 
+ * 依存: config.js, state.js, utils.js, errors.js, error-handler.js, ui.js,
+ *       html-processor.js, table-processor.js, diff-detector.js, navigation.js,
  *       progress-indicator.js
- * 
+ *
  * @fileoverview ファイルの検証、読み込み、処理の管理
  */
 
 'use strict';
 import { CONFIG } from './config.js';
-import { FileValidationError, FileProcessingError, HTMLParsingError, TableProcessingError } from './errors.js';
+import {
+    FileValidationError,
+    FileProcessingError,
+    HTMLParsingError,
+    TableProcessingError,
+} from './errors.js';
 import { AppState, Logger } from './state.js';
 import { Utils, CSSManager } from './utils.js';
 import { ErrorHandler } from './error-handler.js';
@@ -29,38 +34,38 @@ const FileHandler = (() => {
      */
     function validate(file) {
         Logger.log('ファイル検証開始:', file?.name);
-        
+
         if (!file) {
             throw new FileValidationError('ファイルが選択されていません。', 'NO_FILE');
         }
-        
+
         if (!file.name || file.name.trim() === '') {
             throw new FileValidationError('無効なファイル名です。', 'INVALID_NAME');
         }
-        
+
         const fileName = file.name.toLowerCase();
-        const hasValidExtension = CONFIG.SUPPORTED_EXTENSIONS.some(ext => 
+        const hasValidExtension = CONFIG.SUPPORTED_EXTENSIONS.some((ext) =>
             fileName.endsWith(ext.toLowerCase())
         );
-        
+
         if (!hasValidExtension) {
             throw new FileValidationError(
                 `サポートされていないファイル形式です。${CONFIG.SUPPORTED_EXTENSIONS.join(', ')} ファイルを選択してください。`,
                 'INVALID_EXTENSION'
             );
         }
-        
+
         if (file.size > CONFIG.MAX_FILE_SIZE) {
             throw new FileValidationError(
                 `ファイルサイズが大きすぎます。最大サイズ: ${Utils.formatFileSize(CONFIG.MAX_FILE_SIZE)}`,
                 'FILE_TOO_LARGE'
             );
         }
-        
+
         if (file.size === 0) {
             throw new FileValidationError('ファイルが空です。', 'EMPTY_FILE');
         }
-        
+
         return true;
     }
 
@@ -71,24 +76,24 @@ const FileHandler = (() => {
      */
     function process(file) {
         Logger.log('ファイル処理開始');
-        
+
         if (AppState.isProcessing) {
             Logger.log('既に処理中です');
             return;
         }
-        
+
         try {
             validate(file);
         } catch (error) {
             ErrorHandler.handle(error, 'File validation');
             return;
         }
-        
+
         Logger.log('ファイル検証成功、処理開始');
         AppState.isProcessing = true;
-        
+
         const reader = new FileReader();
-        
+
         reader.onload = async () => {
             Logger.log('ファイル読み込み完了 (UTF-8)');
             try {
@@ -103,7 +108,7 @@ const FileHandler = (() => {
                 ErrorHandler.handle(error, 'Encoding re-read');
             }
         };
-        
+
         reader.onerror = (event) => {
             const error = new FileProcessingError(
                 'ファイル読み込みに失敗しました。',
@@ -112,15 +117,12 @@ const FileHandler = (() => {
             );
             ErrorHandler.handle(error, 'File reading');
         };
-        
+
         reader.onabort = () => {
-            const error = new FileProcessingError(
-                'ファイル読み込みが中断されました。',
-                'read'
-            );
+            const error = new FileProcessingError('ファイル読み込みが中断されました。', 'read');
             ErrorHandler.handle(error, 'File reading aborted');
         };
-        
+
         // Shift-JIS で保存された WinMerge レポートにも対応するため、
         // まず UTF-8 で読み込み、文字化けを検出した場合は Shift-JIS で再読込する。
         // 文字化け判定: UTF-8 デコード結果に replacement character (U+FFFD) が含まれるかで判断する。
@@ -139,7 +141,7 @@ const FileHandler = (() => {
         if (!utf8Content.includes('\uFFFD')) {
             return Promise.resolve(utf8Content);
         }
-        
+
         Logger.log('U+FFFD を検出: Shift-JIS で再読込します');
         return new Promise((resolve, reject) => {
             const sjisReader = new FileReader();
@@ -164,8 +166,8 @@ const FileHandler = (() => {
 
             await _stepRead(file, content, progress);
             const sanitized = await _stepSanitize(content, progress);
-            const doc       = await _stepParse(sanitized, progress);
-            const table     = await _stepDetect(doc, progress);
+            const doc = await _stepParse(sanitized, progress);
+            const table = await _stepDetect(doc, progress);
             await _stepMarker(table, progress);
             await _stepRender(progress);
 
@@ -173,16 +175,15 @@ const FileHandler = (() => {
             progress.hide();
             // isProcessing は finally で確実にリセットされるため、ここでは不要
             Logger.log('✅ ファイル処理が正常に完了しました');
-
         } catch (error) {
             if (progress) {
-                const errorMsg = error.message && error.message.length > 50
-                    ? error.message.substring(0, 47) + '...'
-                    : error.message || 'エラーが発生しました';
+                const errorMsg =
+                    error.message && error.message.length > 50
+                        ? error.message.substring(0, 47) + '...'
+                        : error.message || 'エラーが発生しました';
                 progress.showError(errorMsg);
             }
             ErrorHandler.handle(error, 'File load handling');
-
         } finally {
             AppState.isProcessing = false;
         }
@@ -232,12 +233,19 @@ const FileHandler = (() => {
         try {
             sanitized = HTMLProcessor.sanitize(content);
         } catch (error) {
-            throw new FileProcessingError('HTMLのサニタイゼーションに失敗しました', 'sanitize', error);
+            throw new FileProcessingError(
+                'HTMLのサニタイゼーションに失敗しました',
+                'sanitize',
+                error
+            );
         }
         progress.updateStepProgress('sanitize', 50);
 
         if (!sanitized || sanitized.trim().length === 0) {
-            throw new FileProcessingError('サニタイゼーション後にコンテンツが空になりました', 'sanitize');
+            throw new FileProcessingError(
+                'サニタイゼーション後にコンテンツが空になりました',
+                'sanitize'
+            );
         }
         progress.updateStepProgress('sanitize', 100);
         return sanitized;
@@ -349,7 +357,6 @@ const FileHandler = (() => {
                 BlockMarkerGenerator.clearBlockMarkers();
                 BlockMarkerGenerator.generateBlockMarkers(AppState.diffBlocks, currentTable);
                 Logger.log('✅ リサイズ後のミニマップマーカーを再配置');
-
             };
 
             progress.updateStepProgress('marker', 100);
@@ -374,7 +381,11 @@ const FileHandler = (() => {
             AppState.elements.nextDiffButton.onclick = jumpToNextDiffEnhanced;
             progress.updateStepProgress('render', 50);
 
-            CSSManager.hideElement(AppState.elements.toolHeader, 'toolHeader-visible', 'toolHeader-hidden');
+            CSSManager.hideElement(
+                AppState.elements.toolHeader,
+                'toolHeader-visible',
+                'toolHeader-hidden'
+            );
             progress.updateStepProgress('render', 100);
         } catch (error) {
             throw new FileProcessingError('レンダリング中にエラーが発生しました', 'render', error);
@@ -391,18 +402,18 @@ const FileHandler = (() => {
             UI.showMessage('ブロックが見つかりません。', 'warning');
             return;
         }
-        
+
         Navigation.clearCurrentDiffHighlight();
-        
+
         const nextIndex = (AppState.currentDiffIndex + 1) % AppState.diffBlocks.length;
         // currentDiffIndex の更新は jumpToBlock 内で一元管理するため、ここでは行わない
-        
+
         const block = AppState.diffBlocks[nextIndex];
         if (!block || !block.rows || block.rows.length === 0) {
             Logger.warn('無効なブロック:', nextIndex);
             return;
         }
-        
+
         BlockMarkerGenerator.jumpToBlock(nextIndex, block);
     }
 
@@ -416,32 +427,31 @@ const FileHandler = (() => {
             UI.showMessage('ブロックが見つかりません。', 'warning');
             return;
         }
-        
+
         Navigation.clearCurrentDiffHighlight();
-        
-        const prevIndex = AppState.currentDiffIndex <= 0
-            ? AppState.diffBlocks.length - 1
-            : AppState.currentDiffIndex - 1;
+
+        const prevIndex =
+            AppState.currentDiffIndex <= 0
+                ? AppState.diffBlocks.length - 1
+                : AppState.currentDiffIndex - 1;
         // currentDiffIndex の更新は jumpToBlock 内で一元管理するため、ここでは行わない
-        
+
         const block = AppState.diffBlocks[prevIndex];
         if (!block || !block.rows || block.rows.length === 0) {
             Logger.warn('無効なブロック:', prevIndex);
             return;
         }
-        
+
         BlockMarkerGenerator.jumpToBlock(prevIndex, block);
     }
 
-
-    
     // 公開API
     return {
         validate,
         process,
         handleLoad,
         jumpToNextDiffEnhanced,
-        jumpToPrevDiffEnhanced
+        jumpToPrevDiffEnhanced,
     };
 })();
 

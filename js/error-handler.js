@@ -1,14 +1,20 @@
 /**
  * WinMerge Report Viewer - エラーハンドラー
- * 
+ *
  * 統一されたエラーハンドリング
  * 依存: errors.js, state.js, ui.js
- * 
+ *
  * @fileoverview エラーの統一処理とユーザーへの通知
  */
 
 'use strict';
-import { FileValidationError, FileProcessingError, HTMLParsingError, TableProcessingError, NavigationError } from './errors.js';
+import {
+    FileValidationError,
+    FileProcessingError,
+    HTMLParsingError,
+    TableProcessingError,
+    NavigationError,
+} from './errors.js';
 import { AppState, Logger } from './state.js';
 import { UI } from './ui.js';
 
@@ -25,7 +31,7 @@ const ErrorHandler = {
      */
     handle(error, context = '') {
         this.logError(error, context);
-        
+
         if (error instanceof FileValidationError) {
             this.handleFileValidationError(error);
         } else if (error instanceof FileProcessingError) {
@@ -39,7 +45,7 @@ const ErrorHandler = {
         } else {
             this.handleUnknownError(error);
         }
-        
+
         AppState.isProcessing = false;
     },
 
@@ -59,13 +65,15 @@ const ErrorHandler = {
      */
     handleFileProcessingError(error) {
         let userMessage = 'ファイル処理中にエラーが発生しました。';
-        
+
         switch (error.phase) {
             case 'read':
-                userMessage = 'ファイルの読み込みに失敗しました。ファイルが破損している可能性があります。';
+                userMessage =
+                    'ファイルの読み込みに失敗しました。ファイルが破損している可能性があります。';
                 break;
             case 'sanitize':
-                userMessage = 'HTMLファイルの形式に問題があります。WinMergeで生成されたレポートか確認してください。';
+                userMessage =
+                    'HTMLファイルの形式に問題があります。WinMergeで生成されたレポートか確認してください。';
                 break;
             case 'parse':
                 userMessage = 'HTMLの解析に失敗しました。ファイル形式を確認してください。';
@@ -80,7 +88,7 @@ const ErrorHandler = {
                 userMessage = 'レンダリング中にエラーが発生しました。';
                 break;
         }
-        
+
         UI.showMessage(userMessage + ' 詳細はブラウザのコンソールを確認してください。');
     },
 
@@ -143,7 +151,7 @@ const ErrorHandler = {
             message: error.message,
             context: context,
             timestamp: error.timestamp || new Date().toISOString(),
-            stack: error.stack
+            stack: error.stack,
         };
 
         if (error.code) errorInfo.code = error.code;
@@ -152,12 +160,12 @@ const ErrorHandler = {
         if (error.originalError) {
             errorInfo.originalError = {
                 message: error.originalError.message,
-                stack: error.originalError.stack
+                stack: error.originalError.stack,
             };
         }
 
         Logger.error('Error occurred:', errorInfo);
-    }
+    },
 };
 
 export { ErrorHandler };
