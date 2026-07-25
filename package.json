@@ -10,7 +10,8 @@
     "test:ui": "vitest --ui",
     "test:integration": "vitest run --reporter=verbose tests/integration",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --headed"
+    "test:e2e:ui": "playwright test --headed",
+    "lint": "eslint js/"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

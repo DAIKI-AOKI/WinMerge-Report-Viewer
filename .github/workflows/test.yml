@@ -25,6 +25,19 @@ jobs:
           path: coverage/
           retention-days: 30
 
+  lint:
+    name: ESLint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: 依存パッケージをインストール
+        run: npm ci
+      - name: ESLintを実行
+        run: npm run lint
+
   e2e-test:
     name: E2Eテスト
     runs-on: ubuntu-latest
