@@ -73,6 +73,23 @@ describe('Navigation.cleanupAllMarkers()', () => {
     it('マーカーが0件でも例外が発生しない', () => {
         expect(() => Navigation.cleanupAllMarkers()).not.toThrow();
     });
+
+    it('marker.remove() が例外を投げても他のマーカー削除処理が継続する', () => {
+        const paneLeft = AppState.elements.locationPaneLeft;
+        const m1 = document.createElement('div');
+        m1.classList.add('marker');
+        m1.remove = vi.fn(() => {
+            throw new Error('削除失敗テスト');
+        });
+        const m2 = document.createElement('div');
+        m2.classList.add('marker');
+        paneLeft.appendChild(m1);
+        paneLeft.appendChild(m2);
+
+        expect(() => Navigation.cleanupAllMarkers()).not.toThrow();
+        // m1 は remove() が失敗するため残るが、例外は握りつぶされ処理は継続する
+        expect(m1.remove).toHaveBeenCalledOnce();
+    });
 });
 
 // ========================================
@@ -119,14 +136,17 @@ describe('Navigation.resetInterface()', () => {
         expect(UI.clearViewer).toHaveBeenCalledOnce();
     });
 
-    it('block-highlight-wrapper 要素が削除される', () => {
-        const wrapper = document.createElement('div');
-        wrapper.classList.add('block-highlight-wrapper');
-        document.body.appendChild(wrapper);
+    it('block-highlight-wrapper 要素が複数あってもすべて削除される', () => {
+        const wrapper1 = document.createElement('div');
+        wrapper1.classList.add('block-highlight-wrapper');
+        const wrapper2 = document.createElement('div');
+        wrapper2.classList.add('block-highlight-wrapper');
+        document.body.appendChild(wrapper1);
+        document.body.appendChild(wrapper2);
 
         Navigation.resetInterface();
 
-        expect(document.querySelector('.block-highlight-wrapper')).toBeNull();
+        expect(document.querySelectorAll('.block-highlight-wrapper').length).toBe(0);
     });
 
     it('エラーが発生しても UI.showMessage が呼ばれる', () => {
