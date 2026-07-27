@@ -197,6 +197,15 @@ describe('AppState.cleanupEventHandlers()', () => {
         });
         expect(() => AppState.cleanupEventHandlers()).not.toThrow();
     });
+
+    it('intersectionObserver.disconnect() が例外を投げても catch される', () => {
+        AppState.intersectionObserver = {
+            disconnect: vi.fn(() => {
+                throw new Error('disconnect失敗テスト');
+            })
+        };
+        expect(() => AppState.cleanupEventHandlers()).not.toThrow();
+    });
 });
 
 // ========================================
@@ -222,5 +231,29 @@ describe('Logger', () => {
 
     it('error() を呼んでも例外が発生しない', () => {
         expect(() => Logger.error('test')).not.toThrow();
+    });
+
+    it('hostname が localhost でも 127.0.0.1 でもない場合、search に debug=true があれば enabled が true になる', () => {
+        const original = window.location;
+        Object.defineProperty(window, 'location', {
+            value: { hostname: 'example.com', search: '?debug=true' },
+            configurable: true
+        });
+
+        expect(Logger.enabled).toBe(true);
+
+        Object.defineProperty(window, 'location', { value: original, configurable: true });
+    });
+
+    it('hostname が localhost でも 127.0.0.1 でもなく、search にも debug=true がなければ enabled が false になる', () => {
+        const original = window.location;
+        Object.defineProperty(window, 'location', {
+            value: { hostname: 'example.com', search: '' },
+            configurable: true
+        });
+
+        expect(Logger.enabled).toBe(false);
+
+        Object.defineProperty(window, 'location', { value: original, configurable: true });
     });
 });
