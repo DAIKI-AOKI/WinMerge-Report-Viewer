@@ -11,7 +11,17 @@
     "test:integration": "vitest run --reporter=verbose tests/integration",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --headed",
-    "lint": "eslint js/"
+    "lint": "eslint js/",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "js/**/*.js": [
+      "eslint",
+      "prettier --write"
+    ],
+    "*.css": [
+      "prettier --write"
+    ]
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
@@ -20,7 +30,9 @@
     "eslint": "^9.39.5",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.7.0",
+    "husky": "^9.1.7",
     "jsdom": "^25.0.0",
+    "lint-staged": "^16.4.0",
     "prettier": "^3.9.6",
     "vitest": "^2.0.0"
   }
