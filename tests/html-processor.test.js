@@ -32,7 +32,12 @@
  *     - importedStyleElem が null でも例外が発生しない
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ========================================
 // ヘルパー: Document を文字列から生成
@@ -340,5 +345,129 @@ describe('HTMLProcessor.removeImportedStyle()', () => {
     it('importedStyleElem が null でも例外が発生しない', () => {
         AppState.importedStyleElem = null;
         expect(() => HTMLProcessor.removeImportedStyle()).not.toThrow();
+    });
+});
+
+// ========================================
+// HTMLProcessor.sanitize() - html/head/body 誤削除バグの回帰テスト
+// ========================================
+describe('HTMLProcessor.sanitize() - html/head/body 誤削除バグの回帰テスト', () => {
+    // NOTE: ALLOWED_TAGS に html/head/body が含まれていないため、
+    // 以前は <html> 自体が「許可されていないタグ」として削除され、
+    // doc.body が null になり、常に strictBasicSanitize() にフォールバックしていた。
+    // このテストはその再発を防止する。
+
+    it('style タグ（<head>に配置される）と table タグ（<body>に配置される）が両方とも保持される', () => {
+        const result = HTMLProcessor.sanitize(
+            '<style>body{color:red}</style><table><tr><td>A</td></tr></table>'
+        );
+        expect(result).toContain('<style>');
+        expect(result).toContain('<table>');
+    });
+
+    it('script タグは要素ごと除去され、中身のコードもテキストとして残らない', () => {
+        const result = HTMLProcessor.sanitize('<script>alert(1)</script>テキスト');
+        expect(result).not.toContain('<script');
+        expect(result).not.toContain('alert(1)');
+        expect(result).toContain('テキスト');
+    });
+
+    it('iframe タグは中身ごと除去される', () => {
+        const result = HTMLProcessor.sanitize('<iframe src="evil.html">フォールバックテキスト</iframe>');
+        expect(result).not.toContain('<iframe');
+        expect(result).not.toContain('フォールバックテキスト');
+    });
+
+    it('a タグ（危険タグではない不許可タグ）はアンラップされ、リンクテキストは残る', () => {
+        const result = HTMLProcessor.sanitize('<a href="http://example.com">リンクテキスト</a>');
+        expect(result).not.toContain('<a ');
+        expect(result).toContain('リンクテキスト');
+    });
+
+    // NOTE: WinMergeレポートは列幅指定に <colgroup>/<col> を使用しており、
+    // これらが ALLOWED_TAGS に含まれず誤って除去されると、
+    // 差分ビューの左右ペインの表示幅が崩れる（実際に発生した回帰）。
+    it('実際のWinMergeレポート（small-file.htm）で colgroup/col/thead/tbody が保持される', () => {
+        const fixturePath = path.resolve(__dirname, 'fixtures/small-file.htm');
+        const html = fs.readFileSync(fixturePath, 'utf-8');
+
+        const result = HTMLProcessor.sanitize(html);
+
+        expect(result).toContain('<colgroup');
+        expect(result).toContain('<col ');
+        expect(result).toContain('<thead');
+        expect(result).toContain('<tbody');
+        // 列幅指定（0.5em / calc(100% / 2 - 0.5em)）が失われていないことも確認
+        expect(result).toContain('calc(100% / 2 - 0.5em)');
+    });
+});
+
+// ========================================
+// HTMLProcessor.sanitize() - 異常系・フォールバック
+// ========================================
+describe('HTMLProcessor.sanitize() - 異常系・フォールバック', () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it('DOMParser の結果に documentElement が無い場合、strictBasicSanitize にフォールバックする', () => {
+        vi.spyOn(DOMParser.prototype, 'parseFromString').mockReturnValueOnce({
+            documentElement: null,
+        });
+
+        const result = HTMLProcessor.sanitize('<script>alert(1)</script><div>ok</div>');
+        expect(result).not.toContain('<script');
+        expect(result).toContain('ok');
+    });
+
+    it('parseFromString が例外を投げた場合、catchされ strictBasicSanitize にフォールバックする', () => {
+        vi.spyOn(DOMParser.prototype, 'parseFromString').mockImplementationOnce(() => {
+            throw new Error('parse boom');
+        });
+
+        const result = HTMLProcessor.sanitize('<script>alert(1)</script><div>ok</div>');
+        expect(result).not.toContain('<script');
+        expect(result).toContain('ok');
+    });
+
+    it('危険タグ（script）の removeChild が例外を投げても処理は継続する', () => {
+        vi.spyOn(Element.prototype, 'removeChild').mockImplementationOnce(() => {
+            throw new Error('removeChild boom');
+        });
+
+        expect(() =>
+            HTMLProcessor.sanitize('<script>alert(1)</script><div>ok</div>')
+        ).not.toThrow();
+    });
+
+    it('アンラップ対象（a タグ）の insertBefore が例外を投げても処理は継続する', () => {
+        vi.spyOn(Element.prototype, 'insertBefore').mockImplementationOnce(() => {
+            throw new Error('insertBefore boom');
+        });
+
+        expect(() =>
+            HTMLProcessor.sanitize('<div><a href="#">リンク</a></div>')
+        ).not.toThrow();
+    });
+
+    it('アンラップ対象（a タグ）の removeChild が例外を投げても処理は継続する', () => {
+        vi.spyOn(Element.prototype, 'removeChild').mockImplementationOnce(() => {
+            throw new Error('removeChild boom');
+        });
+
+        expect(() =>
+            HTMLProcessor.sanitize('<div><a href="#">リンク</a></div>')
+        ).not.toThrow();
+    });
+});
+
+// ========================================
+// HTMLProcessor.importStyles() - 追加ケース
+// ========================================
+describe('HTMLProcessor.importStyles() - 追加ケース', () => {
+    it('空の style タグでも例外が発生しない', () => {
+        const doc = parseHTML('<html><head><style></style></head></html>');
+        expect(() => HTMLProcessor.importStyles(doc)).not.toThrow();
+        expect(AppState.importedStyleElem.textContent).toBe('\n');
     });
 });

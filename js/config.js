@@ -23,7 +23,25 @@ const CONFIG = {
     // ========================================
     // HTML処理
     // ========================================
-    ALLOWED_TAGS: ['table', 'tr', 'td', 'th', 'span', 'div', 'style'],
+    // NOTE: table/tr/td/th に加え、WinMergeレポートが列幅指定に使う colgroup/col、
+    // および HTML パーサーが自動挿入する thead/tbody/tfoot も許可する。
+    // これらが欠けていると、sanitize() が誤ってこれらのタグを除去し、
+    // 差分テーブルの列幅（colの width 指定）が失われてレイアウトが崩れる。
+    ALLOWED_TAGS: [
+        'table',
+        'colgroup',
+        'col',
+        'thead',
+        'tbody',
+        'tfoot',
+        'caption',
+        'tr',
+        'td',
+        'th',
+        'span',
+        'div',
+        'style',
+    ],
 
     // ========================================
     // 差分表示

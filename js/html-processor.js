@@ -36,14 +36,37 @@ const HTMLProcessor = {
                 return this.strictBasicSanitize(html);
             }
 
+            // NOTE: ALLOWED_TAGS には html/head/body が含まれていない。
+            // 単純に doc.querySelectorAll('*') の全要素を走査すると <html> 自体も
+            // 「許可されていないタグ」と判定されて削除され、doc.body ごと消えてしまう
+            // バグがあったため、html/head/body 自体は除去対象から除外する。
+            // また <style> タグは HTML パーサーの仕様上つねに <head> に配置されるため、
+            // 最終的な戻り値は doc.body だけでなく doc.documentElement（head+body）を使う。
+            const STRUCTURAL_TAGS = ['html', 'head', 'body'];
+            // script/iframe/object/embed/noscript は中身のテキストが実行コード等になり得るため、
+            // <a>や<p>のようにテキストを残す「アンラップ」ではなく、子要素ごと完全に削除する。
+            const DANGEROUS_CONTENT_TAGS = ['script', 'iframe', 'object', 'embed', 'noscript'];
             const allElements = Array.from(doc.querySelectorAll('*'));
             allElements.forEach((el) => {
                 if (!el || !el.tagName || !el.parentNode) return;
+                const tagName = el.tagName.toLowerCase();
+                if (STRUCTURAL_TAGS.includes(tagName)) return;
 
                 // 許可されていないタグを削除（styleタグは許可）
-                if (!CONFIG.ALLOWED_TAGS.includes(el.tagName.toLowerCase())) {
+                if (!CONFIG.ALLOWED_TAGS.includes(tagName)) {
+                    const parent = el.parentNode;
+
+                    if (DANGEROUS_CONTENT_TAGS.includes(tagName)) {
+                        // 中身（実行コード等）ごと完全に削除する
+                        try {
+                            parent.removeChild(el);
+                        } catch {
+                            Logger.warn('Element removal failed');
+                        }
+                        return;
+                    }
+
                     try {
-                        const parent = el.parentNode;
                         const children = Array.from(el.childNodes);
 
                         if (
@@ -92,7 +115,9 @@ const HTMLProcessor = {
             });
 
             Logger.log('HTML sanitization completed successfully');
-            return doc.body ? doc.body.innerHTML : this.strictBasicSanitize(html);
+            return doc.documentElement
+                ? doc.documentElement.innerHTML
+                : this.strictBasicSanitize(html);
         } catch (error) {
             Logger.error('Sanitize error:', error);
             return this.strictBasicSanitize(html);
