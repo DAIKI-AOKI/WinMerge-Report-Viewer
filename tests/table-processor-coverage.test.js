@@ -176,15 +176,23 @@ describe('TableProcessor.setupResizeHandler() - ハンドラ管理', () => {
 // _getTdBgColor() - HEX インラインスタイル分岐
 // ========================================
 describe('TableProcessor._getTdBgColor() 経由 - getRowColors()', () => {
+    // NOTE: jsdom は style.backgroundColor に HEX を代入しても内部的に rgb() へ
+    // 正規化してしまうため、素直に代入するだけでは _getTdBgColor() 内の
+    // HEX 専用分岐（inline.startsWith('#')）を実際には通らない
+    // （getComputedStyle 側の rgb() 分岐で偶然同じ結果になっていた）。
+    // Object.defineProperty で読み取り値を差し替えて、意図した分岐を狙う。
 
     it('HEX インラインスタイル（#efcb05）を rgb 形式に変換して返す', () => {
         const row = document.createElement('tr');
         const td = document.createElement('td');
-        // HEX 形式のインラインスタイル（file:// 環境対応の分岐）
-        td.style.backgroundColor = '#efcb05';
         row.appendChild(td);
         const emptyTd = document.createElement('td');
         row.appendChild(emptyTd);
+
+        Object.defineProperty(td.style, 'backgroundColor', {
+            value: '#efcb05',
+            configurable: true,
+        });
 
         const { left } = TableProcessor.getRowColors(row);
         // HEX が rgb に変換されて返る
@@ -194,10 +202,14 @@ describe('TableProcessor._getTdBgColor() 経由 - getRowColors()', () => {
     it('中立色の HEX（#ffffff）は null を返す', () => {
         const row = document.createElement('tr');
         const td = document.createElement('td');
-        td.style.backgroundColor = '#ffffff';
         row.appendChild(td);
         const emptyTd = document.createElement('td');
         row.appendChild(emptyTd);
+
+        Object.defineProperty(td.style, 'backgroundColor', {
+            value: '#ffffff',
+            configurable: true,
+        });
 
         const { left } = TableProcessor.getRowColors(row);
         expect(left).toBeNull();
@@ -206,12 +218,34 @@ describe('TableProcessor._getTdBgColor() 経由 - getRowColors()', () => {
     it('中立色に近い薄グレー（#f0f0f0）は null を返す', () => {
         const row = document.createElement('tr');
         const td = document.createElement('td');
-        td.style.backgroundColor = '#f0f0f0';
         row.appendChild(td);
         const emptyTd = document.createElement('td');
         row.appendChild(emptyTd);
 
+        Object.defineProperty(td.style, 'backgroundColor', {
+            value: '#f0f0f0',
+            configurable: true,
+        });
+
         const { left } = TableProcessor.getRowColors(row);
+        expect(left).toBeNull();
+    });
+
+    it('# で始まるが不正な形式（6桁hexでない）の場合は hexToRgb が null を返し getComputedStyle にフォールバックする', () => {
+        const row = document.createElement('tr');
+        const td = document.createElement('td');
+        row.appendChild(td);
+        const emptyTd = document.createElement('td');
+        row.appendChild(emptyTd);
+
+        // 3桁hexなど、正規表現 [a-f\d]{2}×3 にマッチしない不正な形式
+        Object.defineProperty(td.style, 'backgroundColor', {
+            value: '#zzz',
+            configurable: true,
+        });
+
+        const { left } = TableProcessor.getRowColors(row);
+        // hexToRgb が null を返し、getComputedStyle 側（無色）で null になる
         expect(left).toBeNull();
     });
 });
@@ -263,5 +297,177 @@ describe('TableProcessor.setupIntersectionObserver() - エラー分岐', () => {
     it('2回呼び出しても例外が発生しない（既存 observer のクリーンアップ）', () => {
         TableProcessor.setupIntersectionObserver();
         expect(() => TableProcessor.setupIntersectionObserver()).not.toThrow();
+    });
+
+    it('IntersectionObserver のコンストラクタが例外を投げても catch され、observer がクリーンアップされる', () => {
+        const OriginalIO = global.IntersectionObserver;
+        global.IntersectionObserver = class {
+            constructor() {
+                throw new Error('IO construction failed');
+            }
+        };
+
+        expect(() => TableProcessor.setupIntersectionObserver()).not.toThrow();
+        expect(AppState.intersectionObserver).toBeNull();
+
+        global.IntersectionObserver = OriginalIO;
+    });
+});
+
+// ========================================
+// cleanupIntersectionObserver() - disconnect() が例外を投げるケース
+// ========================================
+describe('TableProcessor.cleanupIntersectionObserver() - 異常系', () => {
+    it('disconnect() が例外を投げても catch され、参照はクリアされる', () => {
+        AppState.intersectionObserver = {
+            disconnect: () => {
+                throw new Error('disconnect失敗テスト');
+            },
+        };
+
+        expect(() => TableProcessor.cleanupIntersectionObserver()).not.toThrow();
+        expect(AppState.intersectionObserver).toBeNull();
+    });
+});
+
+// ========================================
+// setupIntersectionObserver() - observerCallback（IntersectionObserver 本体の挙動）
+// ========================================
+describe('TableProcessor.setupIntersectionObserver() - observerCallback', () => {
+    it('isIntersecting: true のとき固定ヘッダーが非表示になる', () => {
+        TableProcessor.setupIntersectionObserver();
+        const observer = AppState.intersectionObserver;
+        const headerRow = AppState.elements.viewer.querySelector('table tr');
+
+        observer._cb([{ isIntersecting: true, target: headerRow }]);
+
+        expect(AppState.elements.fixedHeader.classList.contains('fixed-header-hidden')).toBe(
+            true
+        );
+        expect(headerRow.style.visibility).toBe('visible');
+    });
+
+    it('isIntersecting: false かつ target がヘッダー行のとき固定ヘッダーが表示される', () => {
+        TableProcessor.setupIntersectionObserver();
+        const observer = AppState.intersectionObserver;
+        const headerRow = AppState.elements.viewer.querySelector('table tr');
+
+        observer._cb([{ isIntersecting: false, target: headerRow }]);
+
+        expect(AppState.elements.fixedHeader.classList.contains('fixed-header-visible')).toBe(
+            true
+        );
+        expect(headerRow.style.visibility).toBe('hidden');
+    });
+});
+
+// ========================================
+// setupResizeHandler() - debouncedResize コールバック本体
+// ========================================
+describe('TableProcessor.setupResizeHandler() - debouncedResize コールバック本体', () => {
+    it('resizeイベント発火後、固定ヘッダーが表示中なら updateFixedHeaderPosition が呼ばれる', async () => {
+        const table = document.getElementById('mainTable');
+        TableProcessor.setupFixedHeader(table);
+        TableProcessor.setupResizeHandler(table);
+
+        // 固定ヘッダーを「表示中」状態にしておく
+        AppState.elements.fixedHeader.classList.remove('fixed-header-hidden');
+        AppState.elements.fixedHeader.classList.add('fixed-header-visible');
+
+        // updateFixedHeaderPosition() はモジュール内クロージャ経由で呼ばれるため、
+        // TableProcessor.updateFixedHeaderPosition への spy では捕捉できない。
+        // 代わりに、その内部で必ず呼ばれる CSSManager.setVariable を監視する。
+        const setVarSpy = vi.spyOn(CSSManager, 'setVariable');
+
+        window.dispatchEvent(new Event('resize'));
+        await new Promise((resolve) => setTimeout(resolve, CONFIG.RESIZE_DEBOUNCE_DELAY + 50));
+
+        expect(setVarSpy).toHaveBeenCalledWith('fixed-header-left', expect.any(String));
+    });
+
+    it('固定ヘッダーが非表示中なら updateFixedHeaderPosition は呼ばれない', async () => {
+        const table = document.getElementById('mainTable');
+        TableProcessor.setupResizeHandler(table);
+        // fixed-header-hidden のまま（setupDOMのデフォルト）
+
+        const setVarSpy = vi.spyOn(CSSManager, 'setVariable');
+
+        window.dispatchEvent(new Event('resize'));
+        await new Promise((resolve) => setTimeout(resolve, CONFIG.RESIZE_DEBOUNCE_DELAY + 50));
+
+        expect(setVarSpy).not.toHaveBeenCalledWith('fixed-header-left', expect.any(String));
+    });
+
+    it('markerResizeCallback が登録されていれば resize 時に呼ばれる', async () => {
+        const table = document.getElementById('mainTable');
+        TableProcessor.setupResizeHandler(table);
+        const markerResizeCallback = vi.fn();
+        AppState.eventHandlers.markerResizeCallback = markerResizeCallback;
+
+        window.dispatchEvent(new Event('resize'));
+        await new Promise((resolve) => setTimeout(resolve, CONFIG.RESIZE_DEBOUNCE_DELAY + 50));
+
+        expect(markerResizeCallback).toHaveBeenCalled();
+        AppState.eventHandlers.markerResizeCallback = null;
+    });
+
+    it('デバウンス期間中に連続でresizeが発火すると、既存タイマーがクリアされ1回だけ実行される', async () => {
+        const table = document.getElementById('mainTable');
+        TableProcessor.setupResizeHandler(table);
+        const markerResizeCallback = vi.fn();
+        AppState.eventHandlers.markerResizeCallback = markerResizeCallback;
+        const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
+
+        // デバウンス遅延が経過する前に2回連続で発火させる
+        window.dispatchEvent(new Event('resize'));
+        window.dispatchEvent(new Event('resize'));
+
+        // 2回目の発火時点で、1回目がセットした resizeTimeout の clearTimeout が呼ばれているはず
+        expect(clearTimeoutSpy).toHaveBeenCalled();
+
+        await new Promise((resolve) => setTimeout(resolve, CONFIG.RESIZE_DEBOUNCE_DELAY + 50));
+        // 最終的にコールバックは1回だけ実行される
+        expect(markerResizeCallback).toHaveBeenCalledTimes(1);
+        AppState.eventHandlers.markerResizeCallback = null;
+    });
+});
+
+// ========================================
+// setupFixedHeader() - aria-*/data-* 属性のコピー
+// ========================================
+describe('TableProcessor.setupFixedHeader() - aria-*/data-* 属性', () => {
+    it('aria-* 属性がコピーされ、危険な文字がサニタイズされる', () => {
+        document
+            .getElementById('mainTable')
+            .querySelector('th')
+            .setAttribute('aria-label', '<script>列名</script>');
+        TableProcessor.setupFixedHeader(document.getElementById('mainTable'));
+
+        const fixedTh = AppState.elements.fixedHeader.querySelector('th');
+        // <, >, ', " が除去される（on*/javascript: の除去はこの分岐の対象外）
+        expect(fixedTh.getAttribute('aria-label')).toBe('script列名/script');
+    });
+
+    it('data-* 属性がコピーされる', () => {
+        document.getElementById('mainTable').querySelector('th').setAttribute('data-col', 'title');
+        TableProcessor.setupFixedHeader(document.getElementById('mainTable'));
+
+        const fixedTh = AppState.elements.fixedHeader.querySelector('th');
+        expect(fixedTh.getAttribute('data-col')).toBe('title');
+    });
+});
+
+// ========================================
+// updateFixedHeaderPosition() - fixedThs が originalThs より少ないケース
+// ========================================
+describe('TableProcessor.updateFixedHeaderPosition() - th数の不一致', () => {
+    it('fixedTable側のthが originalTable より少ない場合も例外が発生しない', () => {
+        const table = document.getElementById('mainTable');
+        TableProcessor.setupFixedHeader(table);
+        // fixedHeader側のth を1つ削除して、originalより少ない状態を作る
+        const fixedTable = AppState.elements.fixedHeader.querySelector('table');
+        fixedTable.querySelector('tr').lastElementChild.remove();
+
+        expect(() => TableProcessor.updateFixedHeaderPosition(table)).not.toThrow();
     });
 });

@@ -351,19 +351,6 @@ const TableProcessor = (() => {
         return { left: leftColor, right: rightColor };
     }
 
-    /**
-     * 行の背景色を取得（差分行の検出用・後方互換）。
-     * 左右どちらかに有色の td があればその色を返す。
-     * ミニマップ色には getRowColors() を使うこと。
-     *
-     * @param {HTMLTableRowElement} row
-     * @returns {string|null} "rgb(r,g,b)" または null
-     */
-    function getRowBackgroundColor(row) {
-        const { left, right } = getRowColors(row);
-        return left || right || null;
-    }
-
     // 公開API
     return {
         addRightBars,
@@ -372,7 +359,6 @@ const TableProcessor = (() => {
         setupIntersectionObserver,
         setupResizeHandler,
         cleanupIntersectionObserver,
-        getRowBackgroundColor,
         getRowColors,
     };
 })();

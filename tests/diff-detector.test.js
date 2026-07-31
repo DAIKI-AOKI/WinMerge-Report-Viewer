@@ -9,7 +9,7 @@
  *
  * jsdom は getComputedStyle で背景色を返さないため、
  * インラインスタイル（style.backgroundColor）で色を設定する。
- * TableProcessor.getRowBackgroundColor() はインラインスタイルの
+ * TableProcessor.getRowColors() はインラインスタイルの
  * HEX / rgb 両形式をチェックするが、jsdom では rgb 形式で設定すれば
  * getComputedStyle も同じ値を返す。
  */

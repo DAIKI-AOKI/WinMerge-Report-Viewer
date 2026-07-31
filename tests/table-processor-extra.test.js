@@ -2,7 +2,6 @@
  * table-processor.js 追加テスト
  *
  * 検証方針:
- *   - getRowBackgroundColor(): 各色パターンで正しく色を返す
  *   - setupFixedHeader(): ヘッダー行が正しくコピーされる
  *   - addRightBars(): 右端バーセルが追加される
  *   - cleanupIntersectionObserver(): クリーンアップが正常に動く
@@ -39,60 +38,17 @@ function setupDOM() {
 beforeEach(() => setupDOM());
 
 // ========================================
-// getRowBackgroundColor()
+// getRowColors() - td が 0 本の行
 // ========================================
-describe('TableProcessor.getRowBackgroundColor()', () => {
-    it('差分色の td がある行は色を返す（RGB形式）', () => {
+// NOTE: 以前は後方互換の getRowBackgroundColor() 経由でテストしていたが、
+// 同関数は本番コードから一切呼ばれていない未使用関数だったため削除し、
+// 実際に使われている getRowColors() 側のテストとして移植した。
+describe('TableProcessor.getRowColors() - td が 0 本の行', () => {
+    it('td が1つもない行は left=null, right=null を返す', () => {
         const row = document.createElement('tr');
-        const td = document.createElement('td');
-        td.style.backgroundColor = 'rgb(239, 203, 5)';
-        row.appendChild(td);
-        document.body.appendChild(row);
-
-        const result = TableProcessor.getRowBackgroundColor(row);
-        expect(result).toBe('rgb(239, 203, 5)');
-        row.remove();
-    });
-
-    it('HEX形式のインラインスタイルも色を返す', () => {
-        const row = document.createElement('tr');
-        const td = document.createElement('td');
-        td.style.backgroundColor = '#efcb05';
-        row.appendChild(td);
-        document.body.appendChild(row);
-
-        const result = TableProcessor.getRowBackgroundColor(row);
-        expect(result).toBe('rgb(239, 203, 5)');
-        row.remove();
-    });
-
-    it('白背景の行は null を返す', () => {
-        const row = document.createElement('tr');
-        const td = document.createElement('td');
-        td.style.backgroundColor = 'rgb(255, 255, 255)';
-        row.appendChild(td);
-        document.body.appendChild(row);
-
-        const result = TableProcessor.getRowBackgroundColor(row);
-        expect(result).toBeNull();
-        row.remove();
-    });
-
-    it('td がない行は null を返す', () => {
-        const row = document.createElement('tr');
-        const result = TableProcessor.getRowBackgroundColor(row);
-        expect(result).toBeNull();
-    });
-
-    it('added-right-bar クラスの td はスキップされる', () => {
-        const row = document.createElement('tr');
-        const td = document.createElement('td');
-        td.classList.add('added-right-bar');
-        td.style.backgroundColor = 'rgb(239, 203, 5)';
-        row.appendChild(td);
-
-        const result = TableProcessor.getRowBackgroundColor(row);
-        expect(result).toBeNull();
+        const { left, right } = TableProcessor.getRowColors(row);
+        expect(left).toBeNull();
+        expect(right).toBeNull();
     });
 });
 

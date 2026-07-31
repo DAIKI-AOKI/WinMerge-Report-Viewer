@@ -5,9 +5,7 @@
  *   - addRightBars() が各行に added-right-bar セルを追加するか
  *   - setupFixedHeader() がヘッダー行の th を正しくコピーするか
  *   - setupFixedHeader() が危険な属性をサニタイズするか
- *   - getRowBackgroundColor() が差分色行を正しく検出するか
- *   - getRowBackgroundColor() が白・グレー行を除外するか
- *   - getRowBackgroundColor() が added-right-bar を無視するか
+ *   - getRowColors() が差分色行を正しく検出するか（table-processor-coverage.test.jsで詳細テスト）
  *
  * IntersectionObserver を使う setupIntersectionObserver() は
  * jsdom 未実装のためモックを使用する。
@@ -61,24 +59,6 @@ function makeTableWithHeader(headers) {
         tr.appendChild(th);
     });
     table.appendChild(tr);
-    return table;
-}
-
-/**
- * 指定した背景色を td に設定した行を持つテーブルを生成
- * @param {(string|null)[]} colors - 行ごとの背景色
- * @returns {HTMLTableElement}
- */
-function makeTableWithColors(colors) {
-    const table = document.createElement('table');
-    colors.forEach(color => {
-        const tr = document.createElement('tr');
-        const td = document.createElement('td');
-        if (color) td.style.backgroundColor = color;
-        tr.appendChild(td);
-        table.appendChild(tr);
-    });
-    document.body.appendChild(table);
     return table;
 }
 
@@ -198,80 +178,5 @@ describe('TableProcessor.setupFixedHeader()', () => {
     it('テーブルに行がない場合でも例外が発生しない', () => {
         const emptyTable = document.createElement('table');
         expect(() => TableProcessor.setupFixedHeader(emptyTable)).not.toThrow();
-    });
-});
-
-// ========================================
-// TableProcessor.getRowBackgroundColor()
-// ========================================
-describe('TableProcessor.getRowBackgroundColor()', () => {
-    it('差分色（changed）の行は色を返す', () => {
-        const table = makeTableWithColors(['rgb(239, 203, 5)']);
-        const row = table.querySelector('tr');
-        const result = TableProcessor.getRowBackgroundColor(row);
-        expect(result).toBe('rgb(239, 203, 5)');
-    });
-
-    it('差分色（del）の行は色を返す', () => {
-        const table = makeTableWithColors(['rgb(255, 160, 160)']);
-        const row = table.querySelector('tr');
-        const result = TableProcessor.getRowBackgroundColor(row);
-        expect(result).toBe('rgb(255, 160, 160)');
-    });
-
-    it('白背景（rgb(255, 255, 255)）は null を返す', () => {
-        const table = makeTableWithColors(['rgb(255, 255, 255)']);
-        const row = table.querySelector('tr');
-        const result = TableProcessor.getRowBackgroundColor(row);
-        expect(result).toBeNull();
-    });
-
-    it('薄グレー（rgb(240, 240, 240)）は null を返す', () => {
-        const table = makeTableWithColors(['rgb(240, 240, 240)']);
-        const row = table.querySelector('tr');
-        const result = TableProcessor.getRowBackgroundColor(row);
-        expect(result).toBeNull();
-    });
-
-    it('背景色なしの行は null を返す', () => {
-        const table = makeTableWithColors([null]);
-        const row = table.querySelector('tr');
-        const result = TableProcessor.getRowBackgroundColor(row);
-        expect(result).toBeNull();
-    });
-
-    it('added-right-bar セルの色は無視される', () => {
-        // added-right-bar だけが差分色を持つ行は null を返すべき
-        const table = document.createElement('table');
-        const tr = document.createElement('tr');
-        const td = document.createElement('td');
-        td.className = 'added-right-bar';
-        td.style.backgroundColor = 'rgb(239, 203, 5)';
-        tr.appendChild(td);
-        table.appendChild(tr);
-        document.body.appendChild(table);
-
-        const result = TableProcessor.getRowBackgroundColor(tr);
-        expect(result).toBeNull();
-    });
-
-    it('通常の td と added-right-bar が混在する場合は通常 td の色を返す', () => {
-        const table = document.createElement('table');
-        const tr = document.createElement('tr');
-
-        const tdNormal = document.createElement('td');
-        tdNormal.style.backgroundColor = 'rgb(239, 203, 5)';
-
-        const tdBar = document.createElement('td');
-        tdBar.className = 'added-right-bar';
-        tdBar.style.backgroundColor = 'rgb(255, 255, 255)';
-
-        tr.appendChild(tdNormal);
-        tr.appendChild(tdBar);
-        table.appendChild(tr);
-        document.body.appendChild(table);
-
-        const result = TableProcessor.getRowBackgroundColor(tr);
-        expect(result).toBe('rgb(239, 203, 5)');
     });
 });
