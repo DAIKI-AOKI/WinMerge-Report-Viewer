@@ -73,6 +73,24 @@ function setupDOM() {
 }
 
 // ========================================
+// waitFor ヘルパー
+// ========================================
+// FileReader のコールバックは setTimeout(fn, 0) 経由の非同期処理のため、
+// 固定時間の sleep（例: setTimeout(resolve, 30)）で待つと、
+// カバレッジ計測（v8 coverage）のオーバーヘッド等で処理が遅延した場合に
+// フレーキー（間欠的に失敗）になる。条件が満たされるまでポーリングして待つ
+// ことで、実行環境の速度に依存しない安定したテストにする。
+async function waitFor(conditionFn, { timeout = 2000, interval = 10 } = {}) {
+    const start = Date.now();
+    while (!conditionFn()) {
+        if (Date.now() - start > timeout) {
+            throw new Error(`waitFor: ${timeout}ms 以内に条件を満たしませんでした`);
+        }
+        await new Promise((resolve) => setTimeout(resolve, interval));
+    }
+}
+
+// ========================================
 // モックファイルを生成するヘルパー
 // ========================================
 function makeFile({ name = 'test.htm', size = 100, type = 'text/html' } = {}) {
@@ -85,9 +103,9 @@ function makeFile({ name = 'test.htm', size = 100, type = 'text/html' } = {}) {
 // ========================================
 function makeProgressMock() {
     return {
-        show:               vi.fn(),
-        hide:               vi.fn(),
-        showError:          vi.fn(),
+        show: vi.fn(),
+        hide: vi.fn(),
+        showError: vi.fn(),
         updateStepProgress: vi.fn(),
     };
 }
@@ -106,15 +124,15 @@ beforeEach(() => {
     vi.spyOn(BlockMarkerGenerator, 'jumpToBlock').mockImplementation(() => {});
     vi.spyOn(BlockMarkerGenerator, 'updateBlockInfo').mockImplementation(() => {});
     global.TableProcessor = {
-        setupFixedHeader:            vi.fn(),
-        setupIntersectionObserver:   vi.fn(),
-        addRightBars:                vi.fn(),
+        setupFixedHeader: vi.fn(),
+        setupIntersectionObserver: vi.fn(),
+        addRightBars: vi.fn(),
         cleanupIntersectionObserver: vi.fn(),
     };
     global.HTMLProcessor = {
-        sanitize:            vi.fn(html => html),
-        importStyles:        vi.fn(),
-        processTable:        vi.fn(() => {
+        sanitize: vi.fn((html) => html),
+        importStyles: vi.fn(),
+        processTable: vi.fn(() => {
             const t = document.createElement('table');
             t.innerHTML = '<tr><th>A</th></tr>';
             return t;
@@ -134,34 +152,38 @@ afterEach(() => {
 // FileHandler.validate()
 // ========================================
 describe('FileHandler.validate()', () => {
-
     it('null を渡すと NO_FILE エラーを投げる', () => {
-        expect(() => FileHandler.validate(null))
-            .toThrow(expect.objectContaining({ code: 'NO_FILE' }));
+        expect(() => FileHandler.validate(null)).toThrow(
+            expect.objectContaining({ code: 'NO_FILE' })
+        );
     });
 
     it('空ファイル名は INVALID_NAME エラーを投げる', () => {
-        expect(() => FileHandler.validate({ name: '', size: 100 }))
-            .toThrow(expect.objectContaining({ code: 'INVALID_NAME' }));
+        expect(() => FileHandler.validate({ name: '', size: 100 })).toThrow(
+            expect.objectContaining({ code: 'INVALID_NAME' })
+        );
     });
 
     it('.txt 拡張子は INVALID_EXTENSION エラーを投げる', () => {
         const file = makeFile({ name: 'report.txt' });
-        expect(() => FileHandler.validate(file))
-            .toThrow(expect.objectContaining({ code: 'INVALID_EXTENSION' }));
+        expect(() => FileHandler.validate(file)).toThrow(
+            expect.objectContaining({ code: 'INVALID_EXTENSION' })
+        );
     });
 
     it('サイズ超過は FILE_TOO_LARGE エラーを投げる', () => {
         const overSize = CONFIG.MAX_FILE_SIZE + 1;
         const file = makeFile({ name: 'big.htm', size: overSize });
-        expect(() => FileHandler.validate(file))
-            .toThrow(expect.objectContaining({ code: 'FILE_TOO_LARGE' }));
+        expect(() => FileHandler.validate(file)).toThrow(
+            expect.objectContaining({ code: 'FILE_TOO_LARGE' })
+        );
     });
 
     it('size=0 は EMPTY_FILE エラーを投げる', () => {
         const file = makeFile({ name: 'empty.htm', size: 0 });
-        expect(() => FileHandler.validate(file))
-            .toThrow(expect.objectContaining({ code: 'EMPTY_FILE' }));
+        expect(() => FileHandler.validate(file)).toThrow(
+            expect.objectContaining({ code: 'EMPTY_FILE' })
+        );
     });
 
     it('.htm ファイルは true を返す', () => {
@@ -185,8 +207,7 @@ describe('FileHandler.validate()', () => {
     });
 
     it('投げられるエラーは FileValidationError のインスタンスである', () => {
-        expect(() => FileHandler.validate(null))
-            .toThrow(FileValidationError);
+        expect(() => FileHandler.validate(null)).toThrow(FileValidationError);
     });
 });
 
@@ -194,7 +215,6 @@ describe('FileHandler.validate()', () => {
 // FileHandler.process()
 // ========================================
 describe('FileHandler.process()', () => {
-
     it('isProcessing=true のときは何もしない', () => {
         AppState.isProcessing = true;
         const readSpy = vi.spyOn(FileReader.prototype, 'readAsText');
@@ -225,7 +245,6 @@ describe('FileHandler.process()', () => {
 // FileHandler.process() - FileReaderコールバックの異常系
 // ========================================
 describe('FileHandler.process() - FileReaderコールバックの異常系', () => {
-
     it('UTF-8読み込み結果にU+FFFDが含まれ、Shift-JIS再読込がエラーになった場合、FileProcessingError(read)になる', async () => {
         const handleSpy = vi.spyOn(ErrorHandler, 'handle').mockImplementation(() => {});
         vi.spyOn(FileReader.prototype, 'readAsText').mockImplementation(function (file, encoding) {
@@ -243,7 +262,7 @@ describe('FileHandler.process() - FileReaderコールバックの異常系', () 
         });
 
         FileHandler.process(makeFile({ name: 'sjis.htm', size: 100 }));
-        await new Promise((resolve) => setTimeout(resolve, 30));
+        await waitFor(() => handleSpy.mock.calls.length > 0);
 
         expect(handleSpy).toHaveBeenCalledOnce();
         const err = handleSpy.mock.calls[0][0];
@@ -271,11 +290,13 @@ describe('FileHandler.process() - FileReaderコールバックの異常系', () 
         });
 
         FileHandler.process(makeFile({ name: 'sjis.htm', size: 100 }));
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        await waitFor(() => AppState.elements.viewer.querySelector('table') !== null, {
+            timeout: 5000,
+        });
 
         const table = AppState.elements.viewer.querySelector('table');
         expect(table).not.toBeNull();
-    }, 3000);
+    }, 8000);
 
     it('FileReaderのonerrorが発火するとErrorHandler.handleが呼ばれる', async () => {
         const handleSpy = vi.spyOn(ErrorHandler, 'handle').mockImplementation(() => {});
@@ -286,7 +307,7 @@ describe('FileHandler.process() - FileReaderコールバックの異常系', () 
         });
 
         FileHandler.process(makeFile({ name: 'test.htm', size: 100 }));
-        await new Promise((resolve) => setTimeout(resolve, 30));
+        await waitFor(() => handleSpy.mock.calls.length > 0);
 
         expect(handleSpy).toHaveBeenCalledOnce();
         const err = handleSpy.mock.calls[0][0];
@@ -303,7 +324,7 @@ describe('FileHandler.process() - FileReaderコールバックの異常系', () 
         });
 
         FileHandler.process(makeFile({ name: 'test.htm', size: 100 }));
-        await new Promise((resolve) => setTimeout(resolve, 30));
+        await waitFor(() => handleSpy.mock.calls.length > 0);
 
         expect(handleSpy).toHaveBeenCalledOnce();
         const err = handleSpy.mock.calls[0][0];
@@ -316,7 +337,6 @@ describe('FileHandler.process() - FileReaderコールバックの異常系', () 
 // FileHandler.handleLoad() - _stepRead
 // ========================================
 describe('FileHandler.handleLoad() - _stepRead', () => {
-
     it('content が空のとき FileProcessingError (read) が発生する', async () => {
         global.ProgressIndicator = vi.fn(() => makeProgressMock());
         const handleSpy = vi.spyOn(ErrorHandler, 'handle').mockImplementation(() => {});
@@ -342,7 +362,6 @@ describe('FileHandler.handleLoad() - _stepRead', () => {
 // FileHandler.handleLoad() - _stepSanitize
 // ========================================
 describe('FileHandler.handleLoad() - _stepSanitize', () => {
-
     it('HTMLProcessor.sanitize() が空を返すと FileProcessingError (sanitize) が発生する', async () => {
         global.ProgressIndicator = vi.fn(() => makeProgressMock());
         const handleSpy = vi.spyOn(ErrorHandler, 'handle').mockImplementation(() => {});
@@ -362,11 +381,10 @@ describe('FileHandler.handleLoad() - _stepSanitize', () => {
 // FileHandler.handleLoad() - _stepDetect
 // ========================================
 describe('FileHandler.handleLoad() - _stepDetect', () => {
-
     it('HTMLProcessor.processTable() が例外を投げると TableProcessingError が発生する', async () => {
         global.ProgressIndicator = vi.fn(() => makeProgressMock());
         const handleSpy = vi.spyOn(ErrorHandler, 'handle').mockImplementation(() => {});
-        global.HTMLProcessor.sanitize = vi.fn(html => html);
+        global.HTMLProcessor.sanitize = vi.fn((html) => html);
         global.HTMLProcessor.processTable = vi.fn(() => {
             throw new Error('テーブルなし');
         });
@@ -394,7 +412,6 @@ describe('FileHandler.handleLoad() - _stepDetect', () => {
 // FileHandler.jumpToNextDiffEnhanced()
 // ========================================
 describe('FileHandler.jumpToNextDiffEnhanced()', () => {
-
     it('ブロックが0件のとき UI.showMessage が呼ばれる', () => {
         AppState.diffBlocks = [];
         FileHandler.jumpToNextDiffEnhanced();
@@ -403,10 +420,14 @@ describe('FileHandler.jumpToNextDiffEnhanced()', () => {
 
     it('BlockMarkerGenerator.jumpToBlock() が呼ばれる', () => {
         AppState.currentDiffIndex = -1;
-        AppState.diffBlocks = [{
-            id: 0, type: 'changed', color: 'rgb(239,203,5)',
-            rows: [document.createElement('tr')]
-        }];
+        AppState.diffBlocks = [
+            {
+                id: 0,
+                type: 'changed',
+                color: 'rgb(239,203,5)',
+                rows: [document.createElement('tr')],
+            },
+        ];
         FileHandler.jumpToNextDiffEnhanced();
         expect(BlockMarkerGenerator.jumpToBlock).toHaveBeenCalledOnce();
     });
@@ -428,7 +449,6 @@ describe('FileHandler.jumpToNextDiffEnhanced()', () => {
 // FileHandler.jumpToPrevDiffEnhanced()
 // ========================================
 describe('FileHandler.jumpToPrevDiffEnhanced()', () => {
-
     it('ブロックが0件のとき UI.showMessage が呼ばれる', () => {
         AppState.diffBlocks = [];
         FileHandler.jumpToPrevDiffEnhanced();
