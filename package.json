@@ -1,6 +1,6 @@
 {
   "name": "winmerge-report-viewer",
-  "version": "6.2.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,6 +12,8 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --headed",
     "lint": "eslint js/",
+    "lint:css": "stylelint \"*.css\"",
+    "lint:all": "npm run lint && npm run lint:css",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -20,6 +22,7 @@
       "prettier --write"
     ],
     "*.css": [
+      "stylelint --fix",
       "prettier --write"
     ]
   },
@@ -34,6 +37,8 @@
     "jsdom": "^25.0.0",
     "lint-staged": "^16.4.0",
     "prettier": "^3.9.6",
+    "stylelint": "^17.14.1",
+    "stylelint-config-standard": "^40.0.0",
     "vitest": "^2.0.0"
   }
 }

@@ -37,6 +37,8 @@ jobs:
         run: npm ci
       - name: ESLintを実行
         run: npm run lint
+      - name: Stylelintを実行
+        run: npm run lint:css
 
   e2e-test:
     name: E2Eテスト
