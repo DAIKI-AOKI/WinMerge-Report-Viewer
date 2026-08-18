@@ -160,14 +160,12 @@ const Navigation = (() => {
             }
 
             // ステップ12: ハイライトをクリア
+            // NOTE: .block-highlight-wrapper の削除は clearCurrentDiffHighlight() が
+            // 内部で行うため、ここで重複して削除する必要はない（以前は重複コードがあり、
+            // 常に0件に対して forEach するだけの到達不可能な処理になっていたため削除した）。
             clearCurrentDiffHighlight();
 
-            // ステップ13: ブロックハイライトラッパーを削除
-            document.querySelectorAll('.block-highlight-wrapper').forEach((el) => {
-                el.remove();
-            });
-
-            // ステップ14: ツールヘッダーを表示
+            // ステップ13: ツールヘッダーを表示
             if (AppState.elements.toolHeader) {
                 CSSManager.showElement(
                     AppState.elements.toolHeader,

@@ -136,7 +136,7 @@ describe('Navigation.resetInterface()', () => {
         expect(UI.clearViewer).toHaveBeenCalledOnce();
     });
 
-    it('block-highlight-wrapper 要素が複数あってもすべて削除される', () => {
+    it('block-highlight-wrapper 要素が複数あってもすべて削除される（clearCurrentDiffHighlight経由）', () => {
         const wrapper1 = document.createElement('div');
         wrapper1.classList.add('block-highlight-wrapper');
         const wrapper2 = document.createElement('div');
