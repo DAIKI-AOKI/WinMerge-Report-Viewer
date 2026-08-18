@@ -74,6 +74,13 @@ describe('Navigation.cleanupAllMarkers()', () => {
         expect(() => Navigation.cleanupAllMarkers()).not.toThrow();
     });
 
+    it('locationPaneLeft/Right が両方とも null でも例外が発生しない', () => {
+        AppState.elements.locationPaneLeft = null;
+        AppState.elements.locationPaneRight = null;
+
+        expect(() => Navigation.cleanupAllMarkers()).not.toThrow();
+    });
+
     it('marker.remove() が例外を投げても他のマーカー削除処理が継続する', () => {
         const paneLeft = AppState.elements.locationPaneLeft;
         const m1 = document.createElement('div');

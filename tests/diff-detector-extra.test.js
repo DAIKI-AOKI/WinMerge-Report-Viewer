@@ -40,8 +40,12 @@ function makeBlock(id = 0, rowCount = 2) {
         return tr;
     });
     return {
-        id, type: 'changed', color: 'rgb(239, 203, 5)',
-        startIndex: id * rowCount, endIndex: id * rowCount + rowCount - 1, rows
+        id,
+        type: 'changed',
+        color: 'rgb(239, 203, 5)',
+        startIndex: id * rowCount,
+        endIndex: id * rowCount + rowCount - 1,
+        rows,
     };
 }
 
@@ -134,7 +138,72 @@ describe('BlockMarkerGenerator - マーカークリック委譲', () => {
         marker.dataset.blockIndex = '99';
         paneLeft.appendChild(marker);
 
-        expect(() => marker.dispatchEvent(new MouseEvent('click', { bubbles: true }))).not.toThrow();
+        expect(() =>
+            marker.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        ).not.toThrow();
+        expect(AppState.currentDiffIndex).toBe(-1);
+    });
+});
+
+// ========================================
+// マーカーのキーボード操作 (keydownHandler: Enter / Space)
+// ========================================
+describe('BlockMarkerGenerator - マーカーのキーボード操作', () => {
+    it('Enterキーで該当ブロックへジャンプする', () => {
+        const block = makeBlock(0, 2);
+        AppState.diffBlocks = [block];
+        BlockMarkerGenerator.cleanup();
+        BlockMarkerGenerator.generateBlockMarkers([], null);
+
+        const paneLeft = AppState.elements.locationPaneLeft;
+        const marker = document.createElement('div');
+        marker.classList.add('marker', 'block-marker');
+        marker.dataset.blockIndex = '0';
+        paneLeft.appendChild(marker);
+
+        const event = new KeyboardEvent('keydown', {
+            key: 'Enter',
+            bubbles: true,
+            cancelable: true,
+        });
+        marker.dispatchEvent(event);
+
+        expect(AppState.currentDiffIndex).toBe(0);
+        expect(event.defaultPrevented).toBe(true);
+    });
+
+    it('スペースキーで該当ブロックへジャンプする', () => {
+        const block = makeBlock(0, 2);
+        AppState.diffBlocks = [block];
+        BlockMarkerGenerator.cleanup();
+        BlockMarkerGenerator.generateBlockMarkers([], null);
+
+        const paneLeft = AppState.elements.locationPaneLeft;
+        const marker = document.createElement('div');
+        marker.classList.add('marker', 'block-marker');
+        marker.dataset.blockIndex = '0';
+        paneLeft.appendChild(marker);
+
+        marker.dispatchEvent(
+            new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true })
+        );
+
+        expect(AppState.currentDiffIndex).toBe(0);
+    });
+
+    it('Enter/Space 以外のキーではジャンプしない', () => {
+        AppState.diffBlocks = [makeBlock(0, 2)];
+        BlockMarkerGenerator.cleanup();
+        BlockMarkerGenerator.generateBlockMarkers([], null);
+
+        const paneLeft = AppState.elements.locationPaneLeft;
+        const marker = document.createElement('div');
+        marker.classList.add('marker', 'block-marker');
+        marker.dataset.blockIndex = '0';
+        paneLeft.appendChild(marker);
+
+        marker.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+
         expect(AppState.currentDiffIndex).toBe(-1);
     });
 });
@@ -259,5 +328,30 @@ describe('BlockMarkerGenerator.generateBlockMarkers() - 実際のマーカー配
 
         expect(paneLeft.querySelectorAll('.block-marker').length).toBe(0);
         expect(paneRight.querySelectorAll('.block-marker').length).toBe(1);
+    });
+
+    it('scrollHeightが有効でも paneHeight (clientHeight) が0の場合はマーカーを配置せず警告のみ出す', async () => {
+        const block = makeBlock(0, 2);
+        block.leftColor = 'rgb(239, 203, 5)';
+        block.rightColor = 'rgb(239, 203, 5)';
+        AppState.diffBlocks = [block];
+
+        const diffContent = AppState.elements.diffContent;
+        const paneLeft = AppState.elements.locationPaneLeft;
+        const paneRight = AppState.elements.locationPaneRight;
+
+        // scrollHeight は非0にするが、clientHeight は jsdom のデフォルト(0)のままにする
+        Object.defineProperty(diffContent, 'scrollHeight', { value: 1000, configurable: true });
+
+        const warnSpy = vi.spyOn(Logger, 'warn').mockImplementation(() => {});
+
+        BlockMarkerGenerator.cleanup();
+        BlockMarkerGenerator.generateBlockMarkers([block], diffContent);
+
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+        expect(paneLeft.querySelectorAll('.block-marker').length).toBe(0);
+        expect(paneRight.querySelectorAll('.block-marker').length).toBe(0);
+        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('paneHeight'));
     });
 });

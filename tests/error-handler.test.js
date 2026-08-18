@@ -100,7 +100,7 @@ describe('ErrorHandler.handleFileProcessingError()', () => {
 
     const phases = ['read', 'sanitize', 'parse', 'detect', 'marker', 'render'];
 
-    phases.forEach(phase => {
+    phases.forEach((phase) => {
         it(`phase="${phase}" で UI.showMessage が呼ばれる`, () => {
             const err = new FileProcessingError('失敗', phase);
             ErrorHandler.handleFileProcessingError(err);
@@ -186,6 +186,19 @@ describe('ErrorHandler.logError()', () => {
         ErrorHandler.logError(new FileValidationError('失敗', 'FILE_TOO_LARGE'), 'validation');
         const info = captured[0][1];
         expect(info.code).toBe('FILE_TOO_LARGE');
+        spy.mockRestore();
+    });
+
+    it('error.name が空文字の場合、フォールバックで "Error" が記録される', () => {
+        const captured = [];
+        const spy = vi.spyOn(Logger, 'error').mockImplementation((...args) => captured.push(args));
+
+        const err = new Error('名前なしエラー');
+        err.name = ''; // name を意図的に空にする（Error以外の非標準オブジェクトを模倣）
+        ErrorHandler.logError(err, 'ctx');
+
+        const info = captured[0][1];
+        expect(info.name).toBe('Error');
         spy.mockRestore();
     });
 });

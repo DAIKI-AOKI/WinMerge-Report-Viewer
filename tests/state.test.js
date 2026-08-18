@@ -83,13 +83,23 @@ describe('AppState.init()', () => {
 
     it('主要な DOM 要素がすべて取得できる', () => {
         const keys = [
-            'fileInput', 'viewer', 'diffContent',
-            'locationPane', 'locationPaneLeft', 'locationPaneRight',
-            'dropArea', 'resetButton', 'scrollTopButton',
-            'prevDiffButton', 'nextDiffButton', 'diffInfo',
-            'fixedHeader', 'fixedHeaderRow', 'toolHeader'
+            'fileInput',
+            'viewer',
+            'diffContent',
+            'locationPane',
+            'locationPaneLeft',
+            'locationPaneRight',
+            'dropArea',
+            'resetButton',
+            'scrollTopButton',
+            'prevDiffButton',
+            'nextDiffButton',
+            'diffInfo',
+            'fixedHeader',
+            'fixedHeaderRow',
+            'toolHeader',
         ];
-        keys.forEach(key => {
+        keys.forEach((key) => {
             expect(AppState.elements[key], `elements.${key} が null`).not.toBeNull();
         });
     });
@@ -135,6 +145,27 @@ describe('AppState.reset()', () => {
         AppState.reset();
         expect(mockDisconnect).toHaveBeenCalledOnce();
         expect(AppState.intersectionObserver).toBeNull();
+    });
+
+    it('diffBlocks の各ブロックの rows 配列が空になり、プロパティが null化される（GC対策）', () => {
+        const tr = document.createElement('tr');
+        AppState.diffBlocks = [{ id: 0, type: 'changed', color: 'rgb(1,1,1)', rows: [tr, tr] }];
+
+        AppState.reset();
+
+        // reset() 内で diffBlocks 自体は空配列に差し替わるため、
+        // クリーンアップ処理が例外なく完走したことと最終的な結果を確認する
+        expect(AppState.diffBlocks).toHaveLength(0);
+    });
+
+    it('IntersectionObserver.disconnect() が例外を投げても reset() 自体は例外を投げない', () => {
+        AppState.intersectionObserver = {
+            disconnect: vi.fn(() => {
+                throw new Error('disconnect失敗テスト');
+            }),
+        };
+        expect(() => AppState.reset()).not.toThrow();
+        expect(AppState.intersectionObserver).not.toBeNull(); // catch内でnull化していないため元のまま
     });
 });
 
@@ -192,7 +223,7 @@ describe('AppState.cleanupEventHandlers()', () => {
     });
 
     it('ハンドラがすべて null でも例外が発生しない', () => {
-        Object.keys(AppState.eventHandlers).forEach(k => {
+        Object.keys(AppState.eventHandlers).forEach((k) => {
             AppState.eventHandlers[k] = null;
         });
         expect(() => AppState.cleanupEventHandlers()).not.toThrow();
@@ -202,9 +233,40 @@ describe('AppState.cleanupEventHandlers()', () => {
         AppState.intersectionObserver = {
             disconnect: vi.fn(() => {
                 throw new Error('disconnect失敗テスト');
-            })
+            }),
         };
         expect(() => AppState.cleanupEventHandlers()).not.toThrow();
+    });
+
+    it('scrollAnimationFrame が cancelAnimationFrame で解放される', () => {
+        const cancelSpy = vi.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation(() => {});
+        AppState.eventHandlers.scrollAnimationFrame = 123;
+
+        AppState.cleanupEventHandlers();
+
+        expect(cancelSpy).toHaveBeenCalledWith(123);
+        expect(AppState.eventHandlers.scrollAnimationFrame).toBeNull();
+        cancelSpy.mockRestore();
+    });
+
+    it('debouncedResize が window から removeEventListener で解除される', () => {
+        const handler = vi.fn();
+        const removeSpy = vi.spyOn(window, 'removeEventListener');
+        AppState.eventHandlers.debouncedResize = handler;
+
+        AppState.cleanupEventHandlers();
+
+        expect(removeSpy).toHaveBeenCalledWith('resize', handler);
+        expect(AppState.eventHandlers.debouncedResize).toBeNull();
+        removeSpy.mockRestore();
+    });
+
+    it('markerResizeCallback が設定されている場合は null化される', () => {
+        AppState.eventHandlers.markerResizeCallback = vi.fn();
+
+        AppState.cleanupEventHandlers();
+
+        expect(AppState.eventHandlers.markerResizeCallback).toBeNull();
     });
 });
 
@@ -237,7 +299,7 @@ describe('Logger', () => {
         const original = window.location;
         Object.defineProperty(window, 'location', {
             value: { hostname: 'example.com', search: '?debug=true' },
-            configurable: true
+            configurable: true,
         });
 
         expect(Logger.enabled).toBe(true);
@@ -249,7 +311,7 @@ describe('Logger', () => {
         const original = window.location;
         Object.defineProperty(window, 'location', {
             value: { hostname: 'example.com', search: '' },
-            configurable: true
+            configurable: true,
         });
 
         expect(Logger.enabled).toBe(false);

@@ -136,6 +136,23 @@ describe('BlockMarkerGenerator.jumpToBlock() - 追加ケース', () => {
         expect(AppState.currentDiffIndex).toBe(1);
         expect(blocks[1].rows[0].scrollIntoView).toHaveBeenCalledOnce();
     });
+
+    it('NAVIGATION_COMPLETE_DELAY 経過後、isNavigatingToDiff が false に戻る', () => {
+        vi.useFakeTimers();
+        try {
+            const block = makeBlock(0, 2);
+            AppState.diffBlocks = [block];
+
+            BlockMarkerGenerator.jumpToBlock(0, block);
+            expect(AppState.isNavigatingToDiff).toBe(true);
+
+            vi.advanceTimersByTime(CONFIG.NAVIGATION_COMPLETE_DELAY);
+
+            expect(AppState.isNavigatingToDiff).toBe(false);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
 });
 
 // ========================================
@@ -184,6 +201,38 @@ describe('BlockMarkerGenerator._createBlockHighlight() 経由 jumpToBlock()', ()
         const wrappers = document.querySelectorAll('.block-highlight-wrapper');
         expect(wrappers.length).toBe(1);
     });
+
+    // NOTE: jsdom は未指定要素の getComputedStyle().position を 'static' ではなく
+    // 空文字で返すため、コンテナに明示的に position:static を設定しないと
+    // 「position:relative へ切り替える」分岐（実CSSでは container が position:static の
+    // ケースに相当）が一度も実行されない。
+    it('container の position が static のとき、position:relative に切り替えられる', () => {
+        const table = makeTableInViewer(3);
+        const block = makeBlock(0, 1);
+        block.rows = [table.querySelectorAll('tr')[0]];
+        AppState.diffBlocks = [block];
+
+        const container = table.parentElement;
+        container.style.position = 'static';
+
+        BlockMarkerGenerator.jumpToBlock(0, block);
+
+        expect(container.style.position).toBe('relative');
+    });
+
+    it('container の position が既に static 以外のときは上書きしない', () => {
+        const table = makeTableInViewer(3);
+        const block = makeBlock(0, 1);
+        block.rows = [table.querySelectorAll('tr')[0]];
+        AppState.diffBlocks = [block];
+
+        const container = table.parentElement;
+        container.style.position = 'absolute';
+
+        BlockMarkerGenerator.jumpToBlock(0, block);
+
+        expect(container.style.position).toBe('absolute');
+    });
 });
 
 // ========================================
@@ -213,6 +262,56 @@ describe('BlockMarkerGenerator.updateBlockHighlight() - 異常系', () => {
         document.body.appendChild(wrapper);
 
         AppState.diffBlocks = [makeBlock(0)]; // index 99 は存在しない
+
+        expect(() => BlockMarkerGenerator.updateBlockHighlight()).not.toThrow();
+        wrapper.remove();
+    });
+
+    it('block.rows の行がテーブルから外れている（closest("table")がnull）場合は何もしない', () => {
+        // table 要素に属さない孤立した tr を使い、firstRow.closest('table') が
+        // null になる状況を再現する
+        const detachedRow = document.createElement('tr');
+        const block = makeBlock(0, 1);
+        block.rows = [detachedRow];
+        AppState.diffBlocks = [block];
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'block-highlight-wrapper';
+        wrapper.dataset.blockIndex = '0';
+        document.body.appendChild(wrapper);
+
+        expect(() => BlockMarkerGenerator.updateBlockHighlight()).not.toThrow();
+        wrapper.remove();
+    });
+
+    it('block.rows が空配列の場合は何もしない', () => {
+        const block = makeBlock(0, 0);
+        block.rows = []; // rows が空
+        AppState.diffBlocks = [block];
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'block-highlight-wrapper';
+        wrapper.dataset.blockIndex = '0';
+        document.body.appendChild(wrapper);
+
+        expect(() => BlockMarkerGenerator.updateBlockHighlight()).not.toThrow();
+        wrapper.remove();
+    });
+
+    it('table が親要素を持たない（parentElementがnull）場合は何もしない', () => {
+        // table を DOM ツリーに追加せず孤立させることで parentElement を null にする
+        const table = document.createElement('table');
+        const tr = document.createElement('tr');
+        table.appendChild(tr);
+
+        const block = makeBlock(0, 1);
+        block.rows = [tr];
+        AppState.diffBlocks = [block];
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'block-highlight-wrapper';
+        wrapper.dataset.blockIndex = '0';
+        document.body.appendChild(wrapper);
 
         expect(() => BlockMarkerGenerator.updateBlockHighlight()).not.toThrow();
         wrapper.remove();
