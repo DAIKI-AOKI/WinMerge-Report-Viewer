@@ -88,14 +88,13 @@ afterEach(() => {
     AppState.diffBlocks = [];
     AppState.currentDiffIndex = -1;
     // block-highlight-wrapper を削除
-    document.querySelectorAll('.block-highlight-wrapper').forEach(el => el.remove());
+    document.querySelectorAll('.block-highlight-wrapper').forEach((el) => el.remove());
 });
 
 // ========================================
 // updateBlockInfo() - 追加ケース
 // ========================================
 describe('BlockMarkerGenerator.updateBlockInfo() - 追加ケース', () => {
-
     it('currentDiffIndex が diffBlocks の範囲外のとき「差分: 0 / N」が表示される', () => {
         AppState.diffBlocks = [makeBlock(0), makeBlock(1)];
         AppState.currentDiffIndex = 5; // 範囲外
@@ -108,7 +107,6 @@ describe('BlockMarkerGenerator.updateBlockInfo() - 追加ケース', () => {
 // jumpToBlock() - 追加ケース
 // ========================================
 describe('BlockMarkerGenerator.jumpToBlock() - 追加ケース', () => {
-
     it('currentDiffIndex が jumpToBlock 後に更新される', () => {
         const block = makeBlock(0, 2);
         AppState.diffBlocks = [block];
@@ -144,7 +142,6 @@ describe('BlockMarkerGenerator.jumpToBlock() - 追加ケース', () => {
 // _createBlockHighlight() - DOM 操作ケース
 // ========================================
 describe('BlockMarkerGenerator._createBlockHighlight() 経由 jumpToBlock()', () => {
-
     it('jumpToBlock 後に .block-highlight-wrapper が DOM に追加される', () => {
         const table = makeTableInViewer(3);
         const block = makeBlock(0, 1);
@@ -156,6 +153,22 @@ describe('BlockMarkerGenerator._createBlockHighlight() 経由 jumpToBlock()', ()
 
         const wrapper = document.querySelector('.block-highlight-wrapper');
         expect(wrapper).not.toBeNull();
+    });
+
+    // 回帰テスト: 以前は _createBlockHighlight() が AppState.currentDiffIndex を
+    // 更新前（＝1つ前の値。初回ジャンプ時は -1）に読んでいたため、
+    // wrapper.dataset.blockIndex に誤った値が書き込まれるバグがあった。
+    it('初回ジャンプ（currentDiffIndex: -1→0）でも wrapper.dataset.blockIndex が正しく現在のindexになる', () => {
+        const table = makeTableInViewer(3);
+        const block = makeBlock(0, 1);
+        block.rows = [table.querySelectorAll('tr')[0]];
+        AppState.diffBlocks = [block];
+        expect(AppState.currentDiffIndex).toBe(-1); // beforeEachでの初期値を前提とする
+
+        BlockMarkerGenerator.jumpToBlock(0, block);
+
+        const wrapper = document.querySelector('.block-highlight-wrapper');
+        expect(wrapper.dataset.blockIndex).toBe('0');
     });
 
     it('2回 jumpToBlock を呼ぶと .block-highlight-wrapper は1件だけになる', () => {
@@ -177,7 +190,6 @@ describe('BlockMarkerGenerator._createBlockHighlight() 経由 jumpToBlock()', ()
 // updateBlockHighlight() - 各異常系分岐
 // ========================================
 describe('BlockMarkerGenerator.updateBlockHighlight() - 異常系', () => {
-
     it('.block-highlight-wrapper がない場合は例外が発生しない', () => {
         AppState.diffBlocks = [makeBlock(0)];
         AppState.currentDiffIndex = 0;
@@ -208,10 +220,82 @@ describe('BlockMarkerGenerator.updateBlockHighlight() - 異常系', () => {
 });
 
 // ========================================
+// updateBlockHighlight() - 正常系（実際に座標を再計算するケース）
+// ========================================
+// NOTE: 以前は「有効なブロックで例外が発生しない」というテストがあったが、
+// DOM に .block-highlight-wrapper が一度も生成されていなかったため
+// 先頭の `if (!wrapper) return;` で毎回早期returnしており、
+// 座標再計算ロジック本体（535, 537-563行目）は一度も実行されていなかった。
+// ここでは jumpToBlock() 経由で実際に .block-highlight-wrapper を生成させたうえで、
+// getBoundingClientRect をモックして座標が正しく再計算されることを検証する。
+describe('BlockMarkerGenerator.updateBlockHighlight() - 正常系', () => {
+    it('リサイズ後の座標（left/top/width/height）が再計算されてwrapperに反映される', () => {
+        const table = makeTableInViewer(2);
+        const rows = table.querySelectorAll('tr');
+        const block = makeBlock(0, 2);
+        block.rows = [rows[0], rows[1]];
+        AppState.diffBlocks = [block];
+
+        // jumpToBlock() 経由で _createBlockHighlight() を呼び、
+        // 実際に .block-highlight-wrapper を DOM に生成させる
+        BlockMarkerGenerator.jumpToBlock(0, block);
+        const wrapper = document.querySelector('.block-highlight-wrapper');
+        expect(wrapper).not.toBeNull();
+
+        const container = table.parentElement;
+        container.scrollTop = 3;
+
+        // リサイズが起きて座標が変わった状況を再現する
+        vi.spyOn(table, 'getBoundingClientRect').mockReturnValue({
+            top: 0,
+            left: 15,
+            right: 215,
+            bottom: 0,
+            width: 200,
+            height: 0,
+        });
+        vi.spyOn(container, 'getBoundingClientRect').mockReturnValue({
+            top: 10,
+            left: 5,
+            right: 0,
+            bottom: 0,
+            width: 0,
+            height: 0,
+        });
+        vi.spyOn(rows[0], 'getBoundingClientRect').mockReturnValue({
+            top: 20,
+            left: 0,
+            right: 0,
+            bottom: 40,
+            width: 0,
+            height: 20,
+        });
+        vi.spyOn(rows[1], 'getBoundingClientRect').mockReturnValue({
+            top: 60,
+            left: 0,
+            right: 0,
+            bottom: 80,
+            width: 0,
+            height: 20,
+        });
+
+        BlockMarkerGenerator.updateBlockHighlight();
+
+        // top = firstRowRect.top - containerRect.top + container.scrollTop = 20 - 10 + 3 = 13
+        expect(wrapper.style.top).toBe('13px');
+        // height = lastRowRect.bottom - firstRowRect.top = 80 - 20 = 60
+        expect(wrapper.style.height).toBe('60px');
+        // left = tableRect.left - containerRect.left = 15 - 5 = 10
+        expect(wrapper.style.left).toBe('10px');
+        // width = tableRect.width = 200
+        expect(wrapper.style.width).toBe('200px');
+    });
+});
+
+// ========================================
 // cleanupDelegation() - 繰り返し呼び出し
 // ========================================
 describe('BlockMarkerGenerator.cleanupDelegation() - 追加ケース', () => {
-
     it('複数回呼び出しても例外が発生しない', () => {
         BlockMarkerGenerator.cleanupDelegation();
         expect(() => BlockMarkerGenerator.cleanupDelegation()).not.toThrow();
@@ -227,7 +311,6 @@ describe('BlockMarkerGenerator.cleanupDelegation() - 追加ケース', () => {
 // setNavigation() - 注入の確認
 // ========================================
 describe('BlockMarkerGenerator.setNavigation()', () => {
-
     it('Navigation を注入して jumpToBlock を呼んでも例外が発生しない', () => {
         const mockNav = {
             clearCurrentDiffHighlight: vi.fn(),
@@ -255,7 +338,6 @@ describe('BlockMarkerGenerator.setNavigation()', () => {
 // DiffBlockDetector.detectBlocks() - 追加ケース
 // ========================================
 describe('DiffBlockDetector.detectBlocks() - 追加ケース', () => {
-
     it('左右で色が異なる行のブロックに leftColor / rightColor が設定される', () => {
         const row = document.createElement('tr');
 

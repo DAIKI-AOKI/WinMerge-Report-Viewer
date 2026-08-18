@@ -440,6 +440,14 @@ const BlockMarkerGenerator = (() => {
 
         _Navigation?.clearCurrentDiffHighlight();
 
+        // NOTE: _createBlockHighlight() は wrapper.dataset.blockIndex に
+        // AppState.currentDiffIndex を書き込む。以前はこの代入が _createBlockHighlight()
+        // の「後」にあったため、生成された wrapper には常に「1つ前の」currentDiffIndex
+        // （初回ジャンプ時は -1）が記録されてしまい、リサイズ時の updateBlockHighlight() が
+        // 誤ったブロック（または blockIndex < 0 で何もしない）を参照するバグがあった。
+        // 必ず _createBlockHighlight() より前に更新すること。
+        AppState.currentDiffIndex = index;
+
         _createBlockHighlight(block);
 
         const firstRow = block.rows[0];
@@ -450,7 +458,6 @@ const BlockMarkerGenerator = (() => {
             Logger.error('スクロールエラー:', error);
         }
 
-        AppState.currentDiffIndex = index;
         AppState.isNavigatingToDiff = true;
 
         // 左右両ペインのマーカーをまとめて選択状態にする
