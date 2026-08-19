@@ -1,0 +1,23 @@
+# これらのファイル/フォルダは、開発用のためエンドユーザー向け配布物には含めません。
+# GitHubの「Code > Download ZIP」および各Releaseの自動生成ソースZIPから除外されます
+# （リポジトリ自体には引き続き含まれ、`git clone`では通常通り取得できます）。
+
+.github/            export-ignore
+.husky/             export-ignore
+tests/              export-ignore
+
+eslint.config.js    export-ignore
+.stylelintrc.json   export-ignore
+.prettierrc         export-ignore
+.prettierignore      export-ignore
+playwright.config.js export-ignore
+vitest.config.js    export-ignore
+package.json        export-ignore
+package-lock.json   export-ignore
+
+document-dev.html   export-ignore
+CONTRIBUTING.md     export-ignore
+
+.gitattributes       export-ignore
+.gitignore           export-ignore
+non-upload.gitignore export-ignore
