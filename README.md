@@ -1,5 +1,9 @@
 # WinMerge Report Viewer
 
+[![テスト自動実行](https://github.com/DAIKI-AOKI/WinMerge-Report-Viewer/actions/workflows/test.yml/badge.svg)](https://github.com/DAIKI-AOKI/WinMerge-Report-Viewer/actions/workflows/test.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/DAIKI-AOKI/WinMerge-Report-Viewer/blob/main/LICENSE)
+[![Release](https://img.shields.io/github/v/release/DAIKI-AOKI/WinMerge-Report-Viewer)](https://github.com/DAIKI-AOKI/WinMerge-Report-Viewer/releases/latest)
+
 WinMerge が出力した HTML 差分レポートを、より快適にレビューするためのビューアです。
 
 > **こんな方におすすめです**: WinMerge で HTML レポートを出力し、第三者がレビュー・承認する運用がある方向け。変更管理プロセスや監査対応、文書改訂の承認フローなど、「自分でチェックする人」と「他者としてチェックする人」が分かれている現場で、レビュー担当者が差分をたどりやすくすることを目的に作っています。
