@@ -6,16 +6,7 @@ WinMerge が出力した HTML 差分レポートを、より快適にレビュ�
 
 ## スクリーンショット
 
-<!--
-  TODO: 実際の画面キャプチャに差し替えてください。
-  推奨カット:
-  1. 全体画面（左右ミニマップ + 差分テーブル + フローティングナビゲーションボタン）
-  2. ミニマップで差分ブロックの位置が一目で分かる様子
-  3. 固定ヘッダーがスクロール時にも列名を表示している様子
-  撮り方の一例:
-    npx serve . -p 5500 &
-    # ブラウザで http://localhost:5500 を開き、tests/fixtures/sample.htm を読み込んでキャプチャ
--->
+<img width="640" height="330" alt="WinMerge Report Viewer のデモ" src="https://github.com/user-attachments/assets/6d3f5990-2e76-4670-8947-2a5cef02f0b5" />
 
 ## 主な機能
 
