@@ -10,6 +10,8 @@ WinMerge が出力した HTML 差分レポートを、より快適にレビュ�
 
 ## デモ
 
+[![🔗 デモを開く](https://img.shields.io/badge/🔗_デモを開く-daiki--aoki.github.io-blue?style=for-the-badge)](https://daiki-aoki.github.io/WinMerge-Report-Viewer/)
+
 <img width="640" height="330" alt="WinMerge Report Viewer のデモ" src="https://github.com/user-attachments/assets/6d3f5990-2e76-4670-8947-2a5cef02f0b5" />
 
 ## 主な機能
