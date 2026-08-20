@@ -106,4 +106,9 @@ Issue・Pull Request を歓迎します。開発に参加される場合は [CON
 
 ## ライセンス
 
-MIT
+本プロジェクト自体のコードは [MIT License](./LICENSE) です。
+
+以下、利用している外部リソースとの関係を明記します。
+
+- **[Font Awesome Free](https://fontawesome.com/)**(CDN経由で読み込み、本リポジトリには同梱していません):アイコンは [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)、Webフォントは [SIL OFL 1.1](https://scripts.sil.org/OFL)、コードは MIT License で提供されています。詳細は [Font Awesome Free License](https://fontawesome.com/license/free) をご確認ください
+- **[WinMerge](https://winmerge.org/)**(GPL-2.0):本ツールは WinMerge が生成した HTML レポートを**読み込んで表示するだけ**であり、WinMerge のソースコードを組み込んだり、リンクしたりしていません。そのため WinMerge の GPL-2.0 ライセンスの影響は受けず、本プロジェクトは MIT License のまま配布・利用いただけます
