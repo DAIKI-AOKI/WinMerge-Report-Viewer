@@ -1,0 +1,54 @@
+name: GitHub Pagesへデプロイ
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'index.html'
+      - 'document.html'
+      - 'style.css'
+      - 'favicon.ico'
+      - 'js/**'
+      - '.github/workflows/deploy-pages.yml'
+  workflow_dispatch:
+
+# 同時に複数のデプロイが走らないようにする（前のデプロイ中に新しいpushがあれば、
+# 前のデプロイは中断され、最新のものだけが実行される）
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    name: デプロイ
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 公開に必要なファイルのみをまとめる
+        # node_modules・tests・設定ファイル等は含めず、実際にブラウザで
+        # 動かすために必要な静的ファイルのみを配置する
+        run: |
+          mkdir dist
+          cp index.html document.html style.css favicon.ico dist/
+          cp -r js dist/js
+
+      - name: GitHub Pagesの設定を読み込む
+        uses: actions/configure-pages@v5
+
+      - name: Pages用アーティファクトをアップロード
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - name: GitHub Pagesへデプロイ
+        id: deployment
+        uses: actions/deploy-pages@v4
