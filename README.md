@@ -50,6 +50,8 @@ WinMerge が出力した HTML 差分レポートを、より快適にレビュ�
 │   ├── progress-indicator.js # プログレス表示
 │   ├── ui.js                 # UI 表示制御
 │   └── utils.js              # 汎用ユーティリティ
+├── dist/
+│   └── bundle.js             # js/ をビルドした配布用の単一ファイル（後述）
 └── tests/
     ├── unit/                 # ユニットテスト（Vitest・Node 環境）
     ├── dom/                  # DOM テスト（Vitest・jsdom 環境）
@@ -101,6 +103,16 @@ wmv.debug.memoryStatus()    # メモリ使用量
 wmv.debug.appState()        # AppState の状態
 wmv.debug.all()             # 上記すべて
 ```
+
+## ビルド
+
+`js/` 配下は ES Modules(`import`/`export`)で分割されていますが、これを `file://` で直接開くと、多くのブラウザ(特に Chrome/Edge)は import をオリジンをまたぐ読み込みとみなし CORS エラーでブロックします。これを避けるため、[esbuild](https://esbuild.github.io/) で `js/main.js` を起点に依存関係を解決し、`dist/bundle.js` という単一の通常スクリプトへビルドしています。`index.html` はこの `dist/bundle.js` を読み込みます。
+
+```bash
+npm run build
+```
+
+`dist/bundle.js` は配布のためリポジトリに含めています(`git clone` や ZIP ダウンロードだけでそのまま動く状態を保つため)。`js/` 配下のファイルをコミットすると、pre-commit フック(Husky)が自動的に `npm run build` を実行し、`dist/bundle.js` を最新化してからコミットに含めます。手動でビルドし忘れても、GitHub Actions 側(テスト・Pages デプロイ)でも改めてビルドし直すため、公開されるバンドルが古くなることはありません。
 
 ## コントリビューション
 

@@ -5,6 +5,7 @@
 .github/            export-ignore
 .husky/             export-ignore
 tests/              export-ignore
+scripts/            export-ignore
 
 eslint.config.js    export-ignore
 .stylelintrc.json   export-ignore

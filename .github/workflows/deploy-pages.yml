@@ -9,6 +9,8 @@ on:
       - 'style.css'
       - 'favicon.ico'
       - 'js/**'
+      - 'dist/**'
+      - 'scripts/build.js'
       - '.github/workflows/deploy-pages.yml'
   workflow_dispatch:
 
@@ -33,13 +35,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 依存パッケージをインストール
+        run: npm ci
+
+      - name: 配布用バンドルをビルド
+        # コミット済みの dist/bundle.js を信用せず、ここで js/ の最新内容から
+        # 必ず再ビルドする（pre-commitフックが何らかの理由で走っていなくても
+        # 常に最新の内容がデプロイされるようにするため）
+        run: npm run build
+
       - name: 公開に必要なファイルのみをまとめる
         # node_modules・tests・設定ファイル等は含めず、実際にブラウザで
-        # 動かすために必要な静的ファイルのみを配置する
+        # 動かすために必要な静的ファイルのみを配置する。
+        # index.html は相対パス "dist/bundle.js" を参照しているため、
+        # デプロイ先でも dist/ ディレクトリ構造をそのまま維持する
         run: |
-          mkdir dist
-          cp index.html document.html style.css favicon.ico dist/
-          cp -r js dist/js
+          mkdir -p pages-dist/dist
+          cp index.html document.html style.css favicon.ico pages-dist/
+          cp dist/bundle.js pages-dist/dist/bundle.js
 
       - name: GitHub Pagesの設定を読み込む
         uses: actions/configure-pages@v5
@@ -47,7 +64,7 @@ jobs:
       - name: Pages用アーティファクトをアップロード
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: pages-dist
 
       - name: GitHub Pagesへデプロイ
         id: deployment

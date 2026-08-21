@@ -119,9 +119,14 @@
     </div>
 
     <!-- ========================================
-         JavaScriptモジュール（依存順に読み込み）
+         JavaScript（ビルド済みバンドル）
+         js/配下のESモジュールを scripts/build.js（esbuild）で1本にまとめたもの。
+         file:// で開いた場合の import に起因するCORSブロックを回避するため、
+         type="module" ではなく通常のスクリプトとして読み込んでいる。
+         開発時は js/ 配下の各ファイルを直接編集し、コミット前に
+         pre-commitフック（.husky/pre-commit）で自動的に再ビルドされる。
          ======================================== -->
-    <script type="module" src="js/main.js"></script>
+    <script src="dist/bundle.js"></script>
 
 </body>
 
