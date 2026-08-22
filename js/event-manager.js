@@ -31,6 +31,7 @@ const EventManager = (() => {
         dragHighlight: null,
         dragUnhighlight: null,
         drop: null,
+        keydown: null,
     };
 
     /**
@@ -79,6 +80,57 @@ const EventManager = (() => {
         const files = e.dataTransfer.files;
         if (files.length > 0) {
             FileHandler.process(files[0]);
+        }
+    }
+
+    /**
+     * キーボードショートカットのハンドラ
+     * document.html「キーボードショートカット」節に記載の4操作に対応する。
+     * - Ctrl+↑ / Ctrl+↓: 前/次の差分へジャンプ（前後の差分ボタンと同じ動作）
+     * - Home: レポート最上部へスクロール（トップへボタンと同じ動作）
+     * - Esc: インターフェースをリセット（更新ボタンと同じ動作）
+     *
+     * フォーム要素（input/textarea/contenteditable）にフォーカスがある場合は
+     * ブラウザ標準の動作を優先し、ショートカットは発火させない。
+     * 各操作は対応するボタンの button-hidden クラスで有効/無効を判定する
+     * （ボタン自体が非表示＝ファイル未読込 の場合は何もしない）ことで、
+     * マウス操作と完全に同じ挙動になるようにしている。
+     *
+     * @param {KeyboardEvent} e - キーボードイベント
+     * @returns {void}
+     */
+    function handleKeydown(e) {
+        const activeTag = document.activeElement?.tagName;
+        if (
+            activeTag === 'INPUT' ||
+            activeTag === 'TEXTAREA' ||
+            document.activeElement?.isContentEditable
+        ) {
+            return;
+        }
+
+        const elements = AppState.elements;
+        const isButtonActive = (button) => button && !button.classList.contains('button-hidden');
+
+        if (e.ctrlKey && e.key === 'ArrowDown') {
+            if (isButtonActive(elements.nextDiffButton)) {
+                e.preventDefault();
+                elements.nextDiffButton.click();
+            }
+        } else if (e.ctrlKey && e.key === 'ArrowUp') {
+            if (isButtonActive(elements.prevDiffButton)) {
+                e.preventDefault();
+                elements.prevDiffButton.click();
+            }
+        } else if (e.key === 'Home') {
+            if (isButtonActive(elements.scrollTopButton)) {
+                e.preventDefault();
+                elements.scrollTopButton.click();
+            }
+        } else if (e.key === 'Escape') {
+            if (isButtonActive(elements.resetButton)) {
+                elements.resetButton.click();
+            }
         }
     }
 
@@ -153,6 +205,14 @@ const EventManager = (() => {
 
         eventHandlers.drop = handleDrop;
         elements.dropArea.addEventListener('drop', eventHandlers.drop, false);
+
+        // キーボードショートカット（Ctrl+↑/↓・Home・Esc）
+        // document 全体に登録するため、要素の有無に依存しない。
+        // resetInterface() では消えない（AppState.eventHandlers ではなく
+        // ここで管理するため）ようにし、リセット後もショートカットが
+        // 使い続けられるようにしている。
+        eventHandlers.keydown = handleKeydown;
+        document.addEventListener('keydown', eventHandlers.keydown);
 
         Logger.log('✅ Event listeners initialized with cleanup support');
     }
@@ -248,6 +308,13 @@ const EventManager = (() => {
             elements.dropArea.removeEventListener('drop', eventHandlers.drop, false);
             eventHandlers.drop = null;
             Logger.log('✅ drop ハンドラを削除');
+        }
+
+        // キーボードショートカット
+        if (eventHandlers.keydown) {
+            document.removeEventListener('keydown', eventHandlers.keydown);
+            eventHandlers.keydown = null;
+            Logger.log('✅ keydown ハンドラを削除');
         }
 
         Logger.log('=== EventManager クリーンアップ完了 ===');

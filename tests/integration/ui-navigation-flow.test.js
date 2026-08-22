@@ -21,7 +21,9 @@
  *   - AppState に diffRows / useBlockMode は存在しない
  *   - ナビゲーションは FileHandler.jumpToNextDiffEnhanced に一元化
  *   - locationPane は locationPaneLeft / locationPaneRight の2ペイン構造
- *   - キーボードナビゲーション（J/K キー）は v2 未実装のためテスト対象外
+ *   - キーボードショートカット（Ctrl+↑/↓・Home・Esc）は EventManager に実装
+ *     （document.html「キーボードショートカット」節に対応、下部の
+ *     describe('UIナビゲーションフロー - キーボードショートカット') 参照）
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -57,6 +59,9 @@ function setupDOM() {
         </div>
     `;
     AppState.init();
+    // jsdom は Element.scrollTo を実装していないため、
+    // scrollTopButtonClick 等の呼び出しで例外にならないようスタブする
+    AppState.elements.diffContent.scrollTo = vi.fn();
 }
 
 /**
@@ -217,6 +222,108 @@ describe('UIナビゲーションフロー - ドロップエリア', () => {
         EventManager.handleDrop(fakeEvent);
 
         expect(FileHandler.process).toHaveBeenCalledWith(file);
+    });
+});
+
+// ========================================
+// 統合テスト: キーボードショートカット
+// ========================================
+describe('UIナビゲーションフロー - キーボードショートカット', () => {
+    function dispatchKey(key, { ctrlKey = false } = {}) {
+        document.dispatchEvent(
+            new KeyboardEvent('keydown', { key, ctrlKey, bubbles: true, cancelable: true })
+        );
+    }
+
+    beforeEach(() => {
+        // 4ボタンとも「ファイル読み込み済み」状態（button-hidden解除）にする
+        ['resetButton', 'scrollTopButton', 'prevDiffButton', 'nextDiffButton'].forEach((id) => {
+            AppState.elements[id].classList.remove('button-hidden');
+        });
+        // file-handler.js の _stepRender/_stepMarker が行う onclick 委譲を再現
+        AppState.elements.nextDiffButton.onclick = FileHandler.jumpToNextDiffEnhanced;
+        AppState.elements.prevDiffButton.onclick = FileHandler.jumpToPrevDiffEnhanced;
+    });
+
+    it('Ctrl+↓ で nextDiffButton がクリックされる（次の差分へジャンプ）', () => {
+        setupDiffBlocks(3);
+        const clickSpy = vi.spyOn(AppState.elements.nextDiffButton, 'click');
+
+        dispatchKey('ArrowDown', { ctrlKey: true });
+
+        expect(clickSpy).toHaveBeenCalledOnce();
+        expect(BlockMarkerGenerator.jumpToBlock).toHaveBeenCalledOnce();
+    });
+
+    it('Ctrl+↑ で prevDiffButton がクリックされる（前の差分へジャンプ）', () => {
+        setupDiffBlocks(3);
+        AppState.currentDiffIndex = 1;
+        const clickSpy = vi.spyOn(AppState.elements.prevDiffButton, 'click');
+
+        dispatchKey('ArrowUp', { ctrlKey: true });
+
+        expect(clickSpy).toHaveBeenCalledOnce();
+        expect(BlockMarkerGenerator.jumpToBlock).toHaveBeenCalledOnce();
+    });
+
+    it('Home で scrollTopButton がクリックされる（トップへスクロール）', () => {
+        const clickSpy = vi.spyOn(AppState.elements.scrollTopButton, 'click');
+
+        dispatchKey('Home');
+
+        expect(clickSpy).toHaveBeenCalledOnce();
+    });
+
+    it('Esc で resetButton がクリックされる（リセット）', () => {
+        vi.spyOn(Navigation, 'resetInterface').mockImplementation(() => {});
+        const clickSpy = vi.spyOn(AppState.elements.resetButton, 'click');
+
+        dispatchKey('Escape');
+
+        expect(clickSpy).toHaveBeenCalledOnce();
+        expect(Navigation.resetInterface).toHaveBeenCalledOnce();
+    });
+
+    it('対応するボタンが button-hidden のとき、ショートカットは何も起こさない（ファイル未読込を再現）', () => {
+        AppState.elements.nextDiffButton.classList.add('button-hidden');
+        const clickSpy = vi.spyOn(AppState.elements.nextDiffButton, 'click');
+
+        dispatchKey('ArrowDown', { ctrlKey: true });
+
+        expect(clickSpy).not.toHaveBeenCalled();
+    });
+
+    it('input要素にフォーカスがある場合、ショートカットは発火しない', () => {
+        const input = document.createElement('input');
+        document.body.appendChild(input);
+        input.focus();
+        const clickSpy = vi.spyOn(AppState.elements.resetButton, 'click');
+
+        dispatchKey('Escape');
+
+        expect(clickSpy).not.toHaveBeenCalled();
+        input.remove();
+    });
+
+    // 回帰テスト: 過去、resetInterface() が AppState.eventHandlers を
+    // 丸ごとクリアする際にキーボードショートカットも巻き込まれて消えてしまい、
+    // 一度リセットすると以降ショートカットが使えなくなる不具合があった。
+    // EventManager 側で管理する（AppState.eventHandlers を使わない）ことで
+    // resetInterface() を経てもショートカットが生き続けることを保証する。
+    it('resetInterface() を実行した後も、キーボードショートカットは引き続き使える', () => {
+        setupDiffBlocks(3);
+        Navigation.resetInterface();
+
+        // resetInterface() 後はボタンが再び button-hidden になるため、
+        // 「ファイル読み込み済み」状態を再現してから検証する
+        AppState.elements.nextDiffButton.classList.remove('button-hidden');
+        AppState.elements.nextDiffButton.onclick = FileHandler.jumpToNextDiffEnhanced;
+        setupDiffBlocks(3);
+        const clickSpy = vi.spyOn(AppState.elements.nextDiffButton, 'click');
+
+        dispatchKey('ArrowDown', { ctrlKey: true });
+
+        expect(clickSpy).toHaveBeenCalledOnce();
     });
 });
 

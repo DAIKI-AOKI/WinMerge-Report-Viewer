@@ -2096,7 +2096,8 @@
       dragPreventDefaults: null,
       dragHighlight: null,
       dragUnhighlight: null,
-      drop: null
+      drop: null,
+      keydown: null
     };
     function getTotalDiffCount() {
       return AppState.diffBlocks?.length ?? 0;
@@ -2118,6 +2119,34 @@
       const files = e.dataTransfer.files;
       if (files.length > 0) {
         FileHandler.process(files[0]);
+      }
+    }
+    function handleKeydown(e) {
+      const activeTag = document.activeElement?.tagName;
+      if (activeTag === "INPUT" || activeTag === "TEXTAREA" || document.activeElement?.isContentEditable) {
+        return;
+      }
+      const elements = AppState.elements;
+      const isButtonActive = (button) => button && !button.classList.contains("button-hidden");
+      if (e.ctrlKey && e.key === "ArrowDown") {
+        if (isButtonActive(elements.nextDiffButton)) {
+          e.preventDefault();
+          elements.nextDiffButton.click();
+        }
+      } else if (e.ctrlKey && e.key === "ArrowUp") {
+        if (isButtonActive(elements.prevDiffButton)) {
+          e.preventDefault();
+          elements.prevDiffButton.click();
+        }
+      } else if (e.key === "Home") {
+        if (isButtonActive(elements.scrollTopButton)) {
+          e.preventDefault();
+          elements.scrollTopButton.click();
+        }
+      } else if (e.key === "Escape") {
+        if (isButtonActive(elements.resetButton)) {
+          elements.resetButton.click();
+        }
       }
     }
     function initializeEventListeners() {
@@ -2167,6 +2196,8 @@
       });
       eventHandlers.drop = handleDrop;
       elements.dropArea.addEventListener("drop", eventHandlers.drop, false);
+      eventHandlers.keydown = handleKeydown;
+      document.addEventListener("keydown", eventHandlers.keydown);
       Logger.log("\u2705 Event listeners initialized with cleanup support");
     }
     function cleanup() {
@@ -2241,6 +2272,11 @@
         elements.dropArea.removeEventListener("drop", eventHandlers.drop, false);
         eventHandlers.drop = null;
         Logger.log("\u2705 drop \u30CF\u30F3\u30C9\u30E9\u3092\u524A\u9664");
+      }
+      if (eventHandlers.keydown) {
+        document.removeEventListener("keydown", eventHandlers.keydown);
+        eventHandlers.keydown = null;
+        Logger.log("\u2705 keydown \u30CF\u30F3\u30C9\u30E9\u3092\u524A\u9664");
       }
       Logger.log("=== EventManager \u30AF\u30EA\u30FC\u30F3\u30A2\u30C3\u30D7\u5B8C\u4E86 ===");
     }
