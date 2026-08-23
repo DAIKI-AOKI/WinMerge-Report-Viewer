@@ -209,6 +209,19 @@ const TableProcessor = (() => {
         }
     }
 
+    /**
+     * ウィンドウの resize イベントに、デバウンス付きのハンドラーを登録する。
+     * setupIntersectionObserver() から呼ばれ、固定ヘッダーの表示中に幅を
+     * 追従させることと、ブロックハイライト枠の位置・サイズを再計算させる
+     * ことを目的とする（後者は AppState.eventHandlers.markerResizeCallback
+     * 経由。ブロックモード確立後に file-handler.js が登録する）。
+     *
+     * 既存のリサイズハンドラーが登録済みの場合は、先に解除してから
+     * 登録し直す（多重登録によるメモリリークを防ぐため）。
+     * @private
+     * @param {HTMLTableElement} table - リサイズ時に幅を再計算する対象のテーブル
+     * @returns {void}
+     */
     function setupResizeHandler(table) {
         if (!table) return;
 
