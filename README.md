@@ -8,6 +8,13 @@ WinMerge が出力した HTML 差分レポートを、より快適にレビュ�
 
 > **こんな方におすすめです**: WinMerge で HTML レポートを出力し、第三者がレビュー・承認する運用がある方向け。変更管理プロセスや監査対応、文書改訂の承認フローなど、「自分でチェックする人」と「他者としてチェックする人」が分かれている現場で、レビュー担当者が差分をたどりやすくすることを目的に作っています。
 
+## Before / After
+
+| Before（WinMergeから出力されたHTMLレポート） | After（WinMerge Report Viewer） |
+|--------|-------|
+| ![Before](https://github.com/user-attachments/assets/f9f63f29-3cc1-4703-85b3-cdf83eb12230) | ![After](https://github.com/user-attachments/assets/b7f3ad0a-4a51-49d1-bbac-91d98bd2d92d) |
+| 差分が縦に流れるだけで、どこに変更があるか一目でわかりにくい。ファイルが長いとスクロールで見失いやすい | 左右のミニマップで差分の位置が一目でわかり、クリック・キーボードショートカットで差分間をジャンプできる |
+
 ## デモ
 
 [![🔗 デモを開く](https://img.shields.io/badge/🔗_デモを開く-daiki--aoki.github.io-blue?style=for-the-badge)](https://daiki-aoki.github.io/WinMerge-Report-Viewer/)
