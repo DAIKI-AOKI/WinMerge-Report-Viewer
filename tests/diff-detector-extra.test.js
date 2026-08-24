@@ -354,4 +354,56 @@ describe('BlockMarkerGenerator.generateBlockMarkers() - 実際のマーカー配
         expect(paneRight.querySelectorAll('.block-marker').length).toBe(0);
         expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('paneHeight'));
     });
+
+    // 回帰テスト: ファイル読み込み直後、初回のマーカー配置(_placeBlockMarkers)が
+    // scrollHeight===0 のためリトライ待ちをしている間に、ウィンドウリサイズ等で
+    // generateBlockMarkers() が再度呼ばれると、古いリトライチェーンと新しい
+    // チェーンの両方が完了し、マーカーが重複配置されるバグがあった。
+    // 世代番号(markerGeneration)による無効化で、古いチェーンの結果を破棄する
+    // ことで解消した。
+    it('マーカー配置のリトライ中に generateBlockMarkers() が再度呼ばれても、マーカーは重複しない', async () => {
+        const block = makeBlock(0, 2);
+        block.leftColor = 'rgb(239, 203, 5)';
+        block.rightColor = 'rgb(239, 203, 5)';
+        AppState.diffBlocks = [block];
+
+        const diffContent = AppState.elements.diffContent;
+        const paneLeft = AppState.elements.locationPaneLeft;
+        const paneRight = AppState.elements.locationPaneRight;
+
+        // scrollHeight は最初0を返し、3回目のアクセスから確定した値を返す
+        // （初回描画が数フレーム遅れる状況を再現）
+        let accessCount = 0;
+        Object.defineProperty(diffContent, 'scrollHeight', {
+            configurable: true,
+            get() {
+                accessCount++;
+                return accessCount >= 3 ? 1000 : 0;
+            },
+        });
+        Object.defineProperty(paneLeft, 'clientHeight', { value: 500, configurable: true });
+        Object.defineProperty(paneRight, 'clientHeight', { value: 500, configurable: true });
+
+        block.rows.forEach((row, i) => {
+            Object.defineProperty(row, 'offsetTop', { value: i * 20, configurable: true });
+            Object.defineProperty(row, 'offsetHeight', { value: 20, configurable: true });
+        });
+
+        BlockMarkerGenerator.cleanup();
+
+        // 1回目の呼び出し（ファイル読み込み時を再現）
+        BlockMarkerGenerator.generateBlockMarkers([block], diffContent);
+
+        // scrollHeightがまだ確定していないタイミングで、2回目の呼び出し
+        // （リサイズによる markerResizeCallback 経由の再配置を再現）
+        BlockMarkerGenerator.generateBlockMarkers([block], diffContent);
+
+        // 両方のリトライチェーンが完了するまで十分なフレーム数待つ
+        for (let i = 0; i < 10; i++) {
+            await new Promise((resolve) => requestAnimationFrame(resolve));
+        }
+
+        expect(paneLeft.querySelectorAll('.block-marker').length).toBe(1);
+        expect(paneRight.querySelectorAll('.block-marker').length).toBe(1);
+    });
 });

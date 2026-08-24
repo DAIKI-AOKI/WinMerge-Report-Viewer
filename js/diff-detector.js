@@ -183,6 +183,15 @@ const BlockMarkerGenerator = (() => {
     /** @type {boolean} イベント委譲の初期化フラグ */
     let delegatedEventsInitialized = false;
 
+    // ★競合対策: generateBlockMarkers() が短時間に連続で呼ばれた場合
+    // （例: ファイル読み込み直後、初回描画がまだ完了しないうちに
+    // ウィンドウがリサイズされ markerResizeCallback が発火するケース）、
+    // 古い呼び出しの _placeBlockMarkers() リトライチェーンが後から完了し、
+    // マーカーが重複して配置されることがあった。
+    // 呼び出しごとに世代番号を発行し、実行時点で最新の世代でなければ
+    // 何もしないことで、古いチェーンの結果を無効化する。
+    let markerGeneration = 0;
+
     /** @type {Function|null} クリックイベントハンドラの参照 */
     let clickHandler = null;
 
@@ -214,33 +223,50 @@ const BlockMarkerGenerator = (() => {
 
         clearBlockMarkers();
 
+        // この呼び出し専用の世代番号を発行する。
+        // 実行時（rAF後）に markerGeneration と一致しなければ、
+        // より新しい generateBlockMarkers() 呼び出しに割り込まれた
+        // ということなので、_placeBlockMarkers() 側で処理を中断する。
+        markerGeneration += 1;
+        const myGeneration = markerGeneration;
+
         // requestAnimationFrame でレイアウト確定後にマーカーを配置
-        requestAnimationFrame(() => _placeBlockMarkers(blocks, diffContent));
+        requestAnimationFrame(() => _placeBlockMarkers(blocks, diffContent, 0, myGeneration));
     }
 
     /**
      * ブロックマーカーを DOM に配置する（内部処理）
      * generateBlockMarkers() の requestAnimationFrame コールバックから呼ばれる。
-     * scrollHeight が 0 の場合は次フレームに再試行し、MAX_RETRY 回で打ち切る
+     * scrollHeight が 0 の場合は次フレームに再試行し、
+     * CONFIG.MARKER_PLACEMENT_MAX_RETRY 回で打ち切る
      * （非表示タブ等での無限ループを防止）。
      * @private
      * @param {DiffBlock[]} blocks - ブロック配列
      * @param {HTMLElement} diffContent - スクロール対象要素
      * @param {number} [retryCount=0] - 再試行回数
+     * @param {number} generation - この呼び出しの世代番号（generateBlockMarkers()参照）
      * @returns {void}
      */
-    function _placeBlockMarkers(blocks, diffContent, retryCount = 0) {
-        const MAX_RETRY = 10; // 隠しタブ等でDOMが表示されない場合の無限ループを防ぐ上限
+    function _placeBlockMarkers(blocks, diffContent, retryCount = 0, generation) {
+        // より新しい generateBlockMarkers() 呼び出しに割り込まれていたら、
+        // このチェーンは古い結果になるため何もしない（マーカー重複防止）
+        if (generation !== markerGeneration) {
+            Logger.log('_placeBlockMarkers: より新しい呼び出しに置き換えられたため中断');
+            return;
+        }
+
         const contentHeight = diffContent.scrollHeight;
 
         if (contentHeight === 0) {
-            if (retryCount >= MAX_RETRY) {
+            if (retryCount >= CONFIG.MARKER_PLACEMENT_MAX_RETRY) {
                 Logger.warn(
-                    `_placeBlockMarkers: scrollHeight が ${MAX_RETRY} フレーム後も 0 のため配置をスキップ`
+                    `_placeBlockMarkers: scrollHeight が ${CONFIG.MARKER_PLACEMENT_MAX_RETRY} フレーム後も 0 のため配置をスキップ`
                 );
                 return;
             }
-            requestAnimationFrame(() => _placeBlockMarkers(blocks, diffContent, retryCount + 1));
+            requestAnimationFrame(() =>
+                _placeBlockMarkers(blocks, diffContent, retryCount + 1, generation)
+            );
             return;
         }
 

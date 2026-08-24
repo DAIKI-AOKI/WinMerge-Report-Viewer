@@ -324,8 +324,13 @@
     // ========================================
     BLOCK_LABEL_DISPLAY_THRESHOLD: 20,
     // この数以下の場合、ブロック番号ラベルを表示
-    MARKER_MIN_HEIGHT_PERCENT: 0.5
+    MARKER_MIN_HEIGHT_PERCENT: 0.5,
     // マーカーの最小高さ（%）
+    // requestAnimationFrame は通常1フレーム=約16ms(60fps環境)。
+    // 10フレーム(≒160ms)経っても diffContent.scrollHeight が確定しない場合は、
+    // 隠しタブ等で永久に描画されない異常系と判断し、マーカー配置を諦める。
+    // 通常のレンダリングは2〜3フレームで完了することを確認済み(十分な余裕あり)。
+    MARKER_PLACEMENT_MAX_RETRY: 10
     // ========================================
     // 説明コメント（開発者向け）
     // ========================================
@@ -738,6 +743,17 @@
       }
       element.classList.remove(visibleClass);
       element.classList.add(hiddenClass);
+    },
+    /**
+     * 要素が非表示状態かどうかを判定
+     * このアプリでは「〜-hidden」で終わるクラス名を非表示状態の目印として
+     * 統一的に使っている（showElement/hideElement 参照）。
+     * @param {HTMLElement} element - 判定対象の要素
+     * @returns {boolean} 非表示状態のクラスが付いている場合true（要素自体が無い場合もtrue扱い）
+     */
+    isHidden(element) {
+      if (!element) return true;
+      return Array.from(element.classList).some((c) => c.endsWith("-hidden"));
     }
   };
 
@@ -1401,6 +1417,7 @@
       _Navigation = nav;
     }
     let delegatedEventsInitialized = false;
+    let markerGeneration = 0;
     let clickHandler = null;
     let keydownHandler = null;
     let mouseoverHandler = null;
@@ -1413,19 +1430,26 @@
         delegatedEventsInitialized = true;
       }
       clearBlockMarkers();
-      requestAnimationFrame(() => _placeBlockMarkers(blocks, diffContent));
+      markerGeneration += 1;
+      const myGeneration = markerGeneration;
+      requestAnimationFrame(() => _placeBlockMarkers(blocks, diffContent, 0, myGeneration));
     }
-    function _placeBlockMarkers(blocks, diffContent, retryCount = 0) {
-      const MAX_RETRY = 10;
+    function _placeBlockMarkers(blocks, diffContent, retryCount = 0, generation) {
+      if (generation !== markerGeneration) {
+        Logger.log("_placeBlockMarkers: \u3088\u308A\u65B0\u3057\u3044\u547C\u3073\u51FA\u3057\u306B\u7F6E\u304D\u63DB\u3048\u3089\u308C\u305F\u305F\u3081\u4E2D\u65AD");
+        return;
+      }
       const contentHeight = diffContent.scrollHeight;
       if (contentHeight === 0) {
-        if (retryCount >= MAX_RETRY) {
+        if (retryCount >= CONFIG.MARKER_PLACEMENT_MAX_RETRY) {
           Logger.warn(
-            `_placeBlockMarkers: scrollHeight \u304C ${MAX_RETRY} \u30D5\u30EC\u30FC\u30E0\u5F8C\u3082 0 \u306E\u305F\u3081\u914D\u7F6E\u3092\u30B9\u30AD\u30C3\u30D7`
+            `_placeBlockMarkers: scrollHeight \u304C ${CONFIG.MARKER_PLACEMENT_MAX_RETRY} \u30D5\u30EC\u30FC\u30E0\u5F8C\u3082 0 \u306E\u305F\u3081\u914D\u7F6E\u3092\u30B9\u30AD\u30C3\u30D7`
           );
           return;
         }
-        requestAnimationFrame(() => _placeBlockMarkers(blocks, diffContent, retryCount + 1));
+        requestAnimationFrame(
+          () => _placeBlockMarkers(blocks, diffContent, retryCount + 1, generation)
+        );
         return;
       }
       const paneLeft = AppState.elements.locationPaneLeft;
@@ -2127,7 +2151,7 @@
         return;
       }
       const elements = AppState.elements;
-      const isButtonActive = (button) => button && !button.classList.contains("button-hidden");
+      const isButtonActive = (button) => !CSSManager.isHidden(button);
       if (e.ctrlKey && e.key === "ArrowDown") {
         if (isButtonActive(elements.nextDiffButton)) {
           e.preventDefault();
