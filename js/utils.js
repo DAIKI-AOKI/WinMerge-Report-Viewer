@@ -221,5 +221,16 @@ const CSSManager = {
         element.classList.remove(visibleClass);
         element.classList.add(hiddenClass);
     },
+    /**
+     * 要素が非表示状態かどうかを判定
+     * このアプリでは「〜-hidden」で終わるクラス名を非表示状態の目印として
+     * 統一的に使っている（showElement/hideElement 参照）。
+     * @param {HTMLElement} element - 判定対象の要素
+     * @returns {boolean} 非表示状態のクラスが付いている場合true（要素自体が無い場合もtrue扱い）
+     */
+    isHidden(element) {
+        if (!element) return true;
+        return Array.from(element.classList).some((c) => c.endsWith('-hidden'));
+    },
 };
 export { Utils, CSSManager };

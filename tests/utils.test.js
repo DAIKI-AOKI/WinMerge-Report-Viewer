@@ -154,3 +154,31 @@ describe('CSSManager.hideElement', () => {
         expect(el.classList.contains('something-else')).toBe(true); // 既存クラスは残る
     });
 });
+
+describe('CSSManager.isHidden', () => {
+    it('"〜-hidden" クラスが付いている場合、true を返す', () => {
+        document.body.innerHTML = '<button id="target" class="button-hidden"></button>';
+        const el = document.getElementById('target');
+
+        expect(CSSManager.isHidden(el)).toBe(true);
+    });
+
+    it('"〜-visible" クラスの場合、false を返す', () => {
+        document.body.innerHTML = '<button id="target" class="button-visible"></button>';
+        const el = document.getElementById('target');
+
+        expect(CSSManager.isHidden(el)).toBe(false);
+    });
+
+    it('要素が null / undefined の場合、true を返す（非表示扱い）', () => {
+        expect(CSSManager.isHidden(null)).toBe(true);
+        expect(CSSManager.isHidden(undefined)).toBe(true);
+    });
+
+    it('"info-hidden" など button 以外の命名規則でも判定できる', () => {
+        document.body.innerHTML = '<div id="target" class="info-hidden"></div>';
+        const el = document.getElementById('target');
+
+        expect(CSSManager.isHidden(el)).toBe(true);
+    });
+});

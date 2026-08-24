@@ -1,7 +1,7 @@
 /**
  * EventManager - イベント管理モジュール（メモリリーク完全対策版）
  * ドラッグ&ドロップ、その他のイベントハンドラ
- * 依存: config.js, state.js, file-handler.js, navigation.js
+ * 依存: config.js, state.js, file-handler.js, navigation.js, utils.js
  *
  * @fileoverview イベントリスナーの管理とドラッグ&ドロップ処理
  */
@@ -11,6 +11,7 @@ import { CONFIG } from './config.js';
 import { AppState, Logger } from './state.js';
 import { FileHandler } from './file-handler.js';
 import { Navigation } from './navigation.js';
+import { CSSManager } from './utils.js';
 
 const EventManager = (() => {
     /** @type {string[]} ドラッグ&ドロップイベント名の配列 */
@@ -92,9 +93,9 @@ const EventManager = (() => {
      *
      * フォーム要素（input/textarea/contenteditable）にフォーカスがある場合は
      * ブラウザ標準の動作を優先し、ショートカットは発火させない。
-     * 各操作は対応するボタンの button-hidden クラスで有効/無効を判定する
-     * （ボタン自体が非表示＝ファイル未読込 の場合は何もしない）ことで、
-     * マウス操作と完全に同じ挙動になるようにしている。
+     * 各操作は対応するボタンが非表示状態(CSSManager.isHidden())かどうかで
+     * 有効/無効を判定する（ボタン自体が非表示＝ファイル未読込 の場合は
+     * 何もしない）ことで、マウス操作と完全に同じ挙動になるようにしている。
      *
      * @param {KeyboardEvent} e - キーボードイベント
      * @returns {void}
@@ -110,7 +111,7 @@ const EventManager = (() => {
         }
 
         const elements = AppState.elements;
-        const isButtonActive = (button) => button && !button.classList.contains('button-hidden');
+        const isButtonActive = (button) => !CSSManager.isHidden(button);
 
         if (e.ctrlKey && e.key === 'ArrowDown') {
             if (isButtonActive(elements.nextDiffButton)) {
