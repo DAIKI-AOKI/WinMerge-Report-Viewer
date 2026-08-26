@@ -96,6 +96,12 @@ test.describe('キーボードショートカット', () => {
         const filePath = path.resolve(__dirname, '../fixtures/sample.htm');
         await page.locator('#fileInput').setInputFiles(filePath);
         await expect(page.locator('table.diff')).toBeVisible({ timeout: 5000 });
+
+        // setInputFiles() 実行後は #fileInput（<input>）自体にフォーカスが
+        // 残ったままになる。handleKeydown() は誤操作防止のため input/textarea/
+        // contenteditable にフォーカスがある間はショートカットを発火させない
+        // 仕様（意図した挙動）なので、テスト側で明示的にフォーカスを外す。
+        await page.locator('#fileInput').evaluate((el) => el.blur());
     });
 
     test('Ctrl+↓ で次の差分へジャンプする', async ({ page }) => {
@@ -111,6 +117,13 @@ test.describe('キーボードショートカット', () => {
     });
 
     test('Home でレポート最上部へスクロールする', async ({ page }) => {
+        // sample.htm は内容が小さくスクロール可能な高さが確保できないため、
+        // このテストのみ内容量の多い middle-file.htm に読み込み直す
+        const filePath = path.resolve(__dirname, '../fixtures/middle-file.htm');
+        await page.locator('#fileInput').setInputFiles(filePath);
+        await expect(page.locator('table.diff')).toBeVisible({ timeout: 5000 });
+        await page.locator('#fileInput').evaluate((el) => el.blur());
+
         // 一旦下にスクロールしておく
         await page.evaluate(() => {
             document.getElementById('diffContent').scrollTop = 300;
@@ -360,6 +373,10 @@ test.describe('file:// プロトコルでの起動', () => {
         const filePath = path.resolve(__dirname, '../fixtures/sample.htm');
         await page.locator('#fileInput').setInputFiles(filePath);
         await expect(page.locator('table.diff')).toBeVisible({ timeout: 5000 });
+
+        // #fileInput にフォーカスが残ったままだとショートカットが無視される
+        // 仕様（誤操作防止）のため、明示的にフォーカスを外す
+        await page.locator('#fileInput').evaluate((el) => el.blur());
 
         await page.keyboard.press('Control+ArrowDown');
         await expect(page.locator('#diffInfo')).toContainText('差分: 1');
