@@ -117,12 +117,18 @@ test.describe('キーボードショートカット', () => {
     });
 
     test('Home でレポート最上部へスクロールする', async ({ page }) => {
-        // sample.htm は内容が小さくスクロール可能な高さが確保できないため、
-        // このテストのみ内容量の多い middle-file.htm に読み込み直す
-        const filePath = path.resolve(__dirname, '../fixtures/middle-file.htm');
-        await page.locator('#fileInput').setInputFiles(filePath);
-        await expect(page.locator('table.diff')).toBeVisible({ timeout: 5000 });
-        await page.locator('#fileInput').evaluate((el) => el.blur());
+        // middle-file.htm でも、実際の描画後の高さがビューポートの高さ
+        // (デフォルト720px)を超えるとは限らず、特定フィクスチャの
+        // レンダリング結果の高さに依存するとテストが不安定になる。
+        // ここでは、確実にスクロール可能な状態を作るため、#viewer の末尾に
+        // 高さ3000pxのダミー要素を追加し、フィクスチャの内容量に関わらず
+        // #diffContent が必ずオーバーフローするようにする。
+        await page.evaluate(() => {
+            const spacer = document.createElement('div');
+            spacer.style.height = '3000px';
+            spacer.dataset.testSpacer = 'true';
+            document.getElementById('viewer').appendChild(spacer);
+        });
 
         // 一旦下にスクロールしておく
         await page.evaluate(() => {
