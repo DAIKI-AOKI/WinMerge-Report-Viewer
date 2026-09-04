@@ -19,6 +19,7 @@ import * as esbuild from 'esbuild';
 await esbuild.build({
     entryPoints: ['js/main.js'],
     bundle: true,
+    minify: true, 
     outfile: 'dist/bundle.js',
     format: 'iife',
     target: 'es2020',
