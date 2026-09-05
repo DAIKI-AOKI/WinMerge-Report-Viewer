@@ -40,22 +40,6 @@ jobs:
       - name: Stylelintを実行
         run: npm run lint:css
 
-  build:
-    name: 配布用バンドルのビルド確認
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: 依存パッケージをインストール
-        run: npm ci
-      - name: バンドルをビルド
-        # js/配下がesbuildで正しくバンドルできるかを常に確認する。
-        # ここが壊れると file:// でのアプリ起動自体ができなくなるため、
-        # 通常のユニットテストとは別に必ずチェックする
-        run: npm run build
-
   e2e-test:
     name: E2Eテスト
     runs-on: ubuntu-latest
@@ -66,10 +50,6 @@ jobs:
           node-version: '22'
       - name: 依存パッケージをインストール
         run: npm ci
-      - name: 配布用バンドルをビルド
-        # index.html は dist/bundle.js を参照しているため、E2Eテストの前に
-        # 必ずビルドしておく必要がある
-        run: npm run build
       - name: Playwrightブラウザをインストール
         run: npx playwright install chromium --with-deps
       - name: E2Eテストを実行

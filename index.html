@@ -42,15 +42,10 @@
 
     <!-- 差分位置表示ペイン（左右2ミニマップ） -->
     <div id="locationPane" role="region" aria-label="差分位置表示ペイン">
-        <div id="locationPaneLeft"
-             role="region"
-             aria-label="旧バージョン ミニマップ"
-             aria-describedby="locationPaneDesc">
+        <div id="locationPaneLeft" role="region" aria-label="旧バージョン ミニマップ" aria-describedby="locationPaneDesc">
             <div class="minimap-header" aria-hidden="true">旧</div>
         </div>
-        <div id="locationPaneRight"
-             role="region"
-             aria-label="新バージョン ミニマップ">
+        <div id="locationPaneRight" role="region" aria-label="新バージョン ミニマップ">
             <div class="minimap-header" aria-hidden="true">新</div>
         </div>
         <p id="locationPaneDesc" style="display:none;">
@@ -119,14 +114,13 @@
     </div>
 
     <!-- ========================================
-         JavaScript（ビルド済みバンドル）
-         js/配下のESモジュールを scripts/build.js（esbuild）で1本にまとめたもの。
-         file:// で開いた場合の import に起因するCORSブロックを回避するため、
-         type="module" ではなく通常のスクリプトとして読み込んでいる。
-         開発時は js/ 配下の各ファイルを直接編集し、コミット前に
-         pre-commitフック（.husky/pre-commit）で自動的に再ビルドされる。
+         JavaScript
+         js/main.js を起点に ES Modules (import/export) で読み込む。
+         type="module" のため、file:// で直接開くと import が
+         クロスオリジン扱いとなりCORSでブロックされる（＝サーバー経由での
+         利用を前提とした意図的な仕様）。
          ======================================== -->
-    <script src="dist/bundle.js"></script>
+    <script type="module" src="js/main.js"></script>
 
 </body>
 

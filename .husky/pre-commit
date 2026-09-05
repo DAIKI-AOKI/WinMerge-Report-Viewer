@@ -1,8 +1,1 @@
 npx lint-staged
-
-# js/ 配下に変更が含まれる場合、配布用バンドル(dist/bundle.js)を再生成し
-# コミットに含める（file:// でもそのまま動く単一ファイルを常に最新に保つため）
-if git diff --cached --name-only | grep -q '^js/'; then
-    npm run build
-    git add dist/bundle.js
-fi
