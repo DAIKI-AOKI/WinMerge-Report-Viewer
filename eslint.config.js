@@ -41,7 +41,8 @@ export default [
     },
   },
   {
-    // node_modules や coverage レポートなどはチェック対象外にする
-    ignores: ['node_modules/**', 'coverage/**', 'playwright-report/**', 'test-results/**'],
+    // node_modules や coverage レポート、サードパーティ製ベンダーライブラリ
+    // （js/vendor配下）はチェック対象外にする
+    ignores: ['node_modules/**', 'coverage/**', 'playwright-report/**', 'test-results/**', 'js/vendor/**'],
   },
 ];

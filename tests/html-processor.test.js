@@ -124,6 +124,33 @@ describe('HTMLProcessor.sanitize()', () => {
         expect(result).not.toContain('javascript:');
     });
 
+    // --- style属性内のCSSインジェクション（DOMPurifyはstyle属性の値の中身までは
+    //     検証しないため、uponSanitizeAttribute フックで追加検証している） ---
+    it('style属性内の expression( は属性ごと除去される', () => {
+        const result = HTMLProcessor.sanitize('<td style="width:expression(alert(1))">セル</td>');
+        expect(result).not.toContain('style=');
+        expect(result).toContain('セル');
+    });
+
+    it('style属性内の javascript: は属性ごと除去される', () => {
+        const result = HTMLProcessor.sanitize('<td style="background:url(javascript:alert(1))">セル</td>');
+        expect(result).not.toContain('style=');
+    });
+
+    it('style属性内の @import は属性ごと除去される', () => {
+        const result = HTMLProcessor.sanitize('<div style="@import url(evil.css)">x</div>');
+        expect(result).not.toContain('style=');
+    });
+
+    it('正当な色指定のstyle属性（WinMergeが実際に出力する形式）は保持される', () => {
+        // <td>は table/tr の中でなければHTMLパーサーの仕様上保持されないため、
+        // 正しいテーブル構造で検証する
+        const result = HTMLProcessor.sanitize(
+            '<table><tr><td style="background-color: rgb(239, 203, 5);">セル</td></tr></table>'
+        );
+        expect(result).toContain('background-color: rgb(239, 203, 5)');
+    });
+
     // --- 正常系 ---
     it('WinMerge 形式の差分テーブルは構造が保たれる', () => {
         const html = `
@@ -399,6 +426,32 @@ describe('HTMLProcessor.sanitize() - html/head/body 誤削除バグの回帰テ�
         expect(result).toContain('<tbody');
         // 列幅指定（0.5em / calc(100% / 2 - 0.5em)）が失われていないことも確認
         expect(result).toContain('calc(100% / 2 - 0.5em)');
+    });
+
+    // 回帰テスト: WinMergeは<style>タグの中身を古いブラウザ互換のための
+    // `<!-- -->` コメントで囲む慣習がある。DOMPurifyはコメントを含む
+    // <style>ブロックを、コメントを使った難読化型XSS対策として丸ごと
+    // 削除する挙動をするため、事前にコメント記号だけを除去する前処理
+    // （_stripStyleComments）を入れている。この前処理がないと、実際の
+    // WinMergeレポートを読み込んだ際に<style>タグ自体が消え、差分の
+    // 色付けが一切表示されなくなる。
+    it('実際のWinMergeレポート（small-file.htm）で<style>タグ内のCSSクラス定義が保持される', () => {
+        const fixturePath = path.resolve(__dirname, 'fixtures/small-file.htm');
+        const html = fs.readFileSync(fixturePath, 'utf-8');
+
+        expect(html).toContain('<!--'); // 前提: 元ファイルがコメント記法を使っていること
+
+        const result = HTMLProcessor.sanitize(html);
+
+        expect(result).toContain('<style');
+        expect(result).toContain('.sf3b14'); // WinMergeが生成する色クラスの一例
+    });
+
+    it('<style>タグ内のコメント記法を除去しても、CSSの中身自体は変更されない', () => {
+        const html = '<style><!--\n.foo { color: red; }\n--></style><div class="foo">x</div>';
+        const result = HTMLProcessor.sanitize(html);
+        expect(result).toContain('.foo { color: red; }');
+        expect(result).not.toContain('<!--');
     });
 });
 

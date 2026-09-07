@@ -2,9 +2,15 @@
  * WinMerge Report Viewer - HTML処理
  *
  * HTMLのサニタイゼーションとスタイル処理
- * 依存: config.js, state.js, errors.js, table-processor.js
+ * 依存: config.js, state.js, errors.js, table-processor.js, vendor/purify.es.js
  *
  * @fileoverview HTMLの安全な処理とスタイルインポート
+ *
+ * NOTE: js/vendor/purify.es.js（DOMPurify）はビルドステップなしで直接
+ * importできるよう、npm パッケージの ESM ビルドをそのまま同梱している。
+ * バージョンを更新する場合は、package.json の dompurify を更新した上で、
+ * node_modules/dompurify/dist/purify.es.mjs を js/vendor/purify.es.js に
+ * 上書きコピーすること（自動化するビルド手順は現状ない）。
  */
 
 'use strict';
@@ -12,6 +18,18 @@ import { CONFIG } from './config.js';
 import { AppState, Logger } from './state.js';
 import { TableProcessingError } from './errors.js';
 import { TableProcessor } from './table-processor.js';
+import DOMPurify from './vendor/purify.es.js';
+
+// DOMPurifyは許可した属性(style含む)の「値の中身」までは検証しない仕様のため、
+// style属性については追加でCSSインジェクションパターンを検証するフックを登録する。
+// importStyles()でのCSS安全化と同じ判定基準に揃えている。
+DOMPurify.addHook('uponSanitizeAttribute', (node, data) => {
+    if (data.attrName === 'style' && data.attrValue) {
+        if (/expression\s*\(|javascript\s*:|vbscript\s*:|@import|behavior\s*:|binding\s*:/i.test(data.attrValue)) {
+            data.keepAttr = false;
+        }
+    }
+});
 
 /**
  * HTML処理モジュール
@@ -19,109 +37,52 @@ import { TableProcessor } from './table-processor.js';
  */
 const HTMLProcessor = {
     /**
-     * HTMLをサニタイズ
+     * HTMLをサニタイズ（DOMPurify使用）
+     *
+     * WinMergeが出力するHTMLは、<style>タグの中身を古いブラウザ互換のための
+     * `<!-- ... -->` コメントで囲む慣習がある。DOMPurifyはコメントを使った
+     * 難読化型XSS（mutation XSS）対策として、コメントを含む<style>ブロックを
+     * 丸ごと削除する挙動をするため、DOMPurifyに渡す前にこのコメント記法だけを
+     * 除去する（CSSの中身自体は一切変更しない、単純な文字列置換）。
      * @param {string} html - サニタイズするHTML文字列
      * @returns {string} サニタイズされたHTML
      */
     sanitize(html) {
         Logger.log('HTML sanitization started');
         try {
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, 'text/html');
+            const preprocessed = this._stripStyleComments(html);
 
-            // tagName は HTML 仕様により大文字で返るため toLowerCase() で正規化して比較する。
-            // （'html' との直接比較では常に true になりフォールバックに落ちてしまう）
-            if (!doc.documentElement || doc.documentElement.tagName.toLowerCase() !== 'html') {
-                Logger.warn('HTML parse error detected, falling back to strict sanitize.');
+            const clean = DOMPurify.sanitize(preprocessed, {
+                WHOLE_DOCUMENT: true,
+                ALLOWED_TAGS: CONFIG.ALLOWED_TAGS.concat(['html', 'head', 'body']),
+                ALLOWED_ATTR: CONFIG.ALLOWED_ATTR,
+            });
+
+            if (!clean || !clean.trim()) {
+                Logger.warn('DOMPurify returned empty output, falling back to strict sanitize.');
                 return this.strictBasicSanitize(html);
             }
 
-            // NOTE: ALLOWED_TAGS には html/head/body が含まれていない。
-            // 単純に doc.querySelectorAll('*') の全要素を走査すると <html> 自体も
-            // 「許可されていないタグ」と判定されて削除され、doc.body ごと消えてしまう
-            // バグがあったため、html/head/body 自体は除去対象から除外する。
-            // また <style> タグは HTML パーサーの仕様上つねに <head> に配置されるため、
-            // 最終的な戻り値は doc.body だけでなく doc.documentElement（head+body）を使う。
-            const STRUCTURAL_TAGS = ['html', 'head', 'body'];
-            // script/iframe/object/embed/noscript は中身のテキストが実行コード等になり得るため、
-            // <a>や<p>のようにテキストを残す「アンラップ」ではなく、子要素ごと完全に削除する。
-            const DANGEROUS_CONTENT_TAGS = ['script', 'iframe', 'object', 'embed', 'noscript'];
-            const allElements = Array.from(doc.querySelectorAll('*'));
-            allElements.forEach((el) => {
-                if (!el || !el.tagName || !el.parentNode) return;
-                const tagName = el.tagName.toLowerCase();
-                if (STRUCTURAL_TAGS.includes(tagName)) return;
-
-                // 許可されていないタグを削除（styleタグは許可）
-                if (!CONFIG.ALLOWED_TAGS.includes(tagName)) {
-                    const parent = el.parentNode;
-
-                    if (DANGEROUS_CONTENT_TAGS.includes(tagName)) {
-                        // 中身（実行コード等）ごと完全に削除する
-                        try {
-                            parent.removeChild(el);
-                        } catch {
-                            Logger.warn('Element removal failed');
-                        }
-                        return;
-                    }
-
-                    try {
-                        const children = Array.from(el.childNodes);
-
-                        if (
-                            parent.nodeType === Node.ELEMENT_NODE ||
-                            parent.nodeType === Node.DOCUMENT_FRAGMENT_NODE
-                        ) {
-                            children.forEach((child) => {
-                                try {
-                                    if (
-                                        child.nodeType === Node.TEXT_NODE ||
-                                        child.nodeType === Node.ELEMENT_NODE
-                                    ) {
-                                        parent.insertBefore(child, el);
-                                    }
-                                } catch {
-                                    Logger.warn('Child insertion skipped');
-                                }
-                            });
-                        }
-
-                        try {
-                            parent.removeChild(el);
-                        } catch {
-                            Logger.warn('Element removal failed');
-                        }
-                    } catch {
-                        Logger.warn('Element removal skipped');
-                    }
-                }
-            });
-
-            // 危険な属性を削除（onclickなど）
-            doc.querySelectorAll('*').forEach((el) => {
-                if (el && el.attributes) {
-                    Array.from(el.attributes).forEach((attr) => {
-                        if (attr && attr.name) {
-                            if (
-                                attr.name.startsWith('on') ||
-                                (attr.value && attr.value.toLowerCase().includes('javascript:'))
-                            ) {
-                                el.removeAttribute(attr.name);
-                            }
-                        }
-                    });
-                }
-            });
-
             Logger.log('HTML sanitization completed successfully');
-            return doc.documentElement
-                ? doc.documentElement.innerHTML
-                : this.strictBasicSanitize(html);
+            return clean;
         } catch (error) {
             Logger.error('Sanitize error:', error);
             return this.strictBasicSanitize(html);
         }
+    },
+
+    /**
+     * <style>タグ内の `<!-- -->` コメント記法を除去する（前処理専用、@private）
+     * CSSの中身自体（プロパティ・値）には一切手を加えない。
+     * @private
+     * @param {string} html - 元のHTML文字列
+     * @returns {string} <style>タグ内のコメント記号だけを除去したHTML文字列
+     */
+    _stripStyleComments(html) {
+        return html.replace(/(<style[^>]*>)([\s\S]*?)(<\/style>)/gi, (match, open, content, close) => {
+            const cleaned = content.replace(/<!--/g, '').replace(/-->/g, '');
+            return open + cleaned + close;
+        });
     },
 
     /**

@@ -41,5 +41,8 @@
     "stylelint": "^17.14.1",
     "stylelint-config-standard": "^40.0.0",
     "vitest": "^2.0.0"
+  },
+  "dependencies": {
+    "dompurify": "^3.4.15"
   }
 }

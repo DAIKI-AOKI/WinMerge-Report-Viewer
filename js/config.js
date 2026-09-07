@@ -43,6 +43,13 @@ const CONFIG = {
         'style',
     ],
 
+    // 許可する属性のホワイトリスト（DOMPurifyのALLOWED_ATTRに渡す）。
+    // WinMergeが実際に出力するHTML（tests/fixtures配下の実サンプル）を
+    // 調査した上で決定した最小限のセット。on*属性やhref等は含まれないため、
+    // ALLOWED_TAGSに現れないタグ（script/a/img等）と合わせて、
+    // イベントハンドラやリンク遷移は構造的に発生しない。
+    ALLOWED_ATTR: ['class', 'style', 'colspan', 'rowspan', 'cellpadding', 'cellspacing'],
+
     // ========================================
     // 差分表示
     // ========================================

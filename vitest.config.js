@@ -25,6 +25,7 @@ export default defineConfig({
                 'js/main.js',          // エントリーポイント（統合テストの対象）
                 'js/event-manager.js', // UIイベント（統合テストの対象）
                 'js/ui.js',            // 表示制御（統合テストの対象）
+                'js/vendor/**',        // サードパーティ製ライブラリ（自作コードではないため対象外）
             ],
             reporter: ['text', 'lcov', 'html'],
             reportsDirectory: 'coverage',
