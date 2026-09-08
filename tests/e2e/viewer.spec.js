@@ -20,16 +20,16 @@ test.describe('ファイル読み込み', () => {
     test('HTMファイルを読み込むと差分テーブルが表示される', async ({ page }) => {
         await page.goto(APP_URL);
 
-        const filePath = path.resolve(__dirname, '../fixtures/sample.htm');
+        const filePath = path.resolve(__dirname, '../fixtures/small-file.htm');
         await page.locator('#fileInput').setInputFiles(filePath);
 
-        await expect(page.locator('table.diff')).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('#viewer table')).toBeVisible({ timeout: 5000 });
     });
 
     test('ファイル読み込み後にドロップエリアが非表示になる', async ({ page }) => {
         await page.goto(APP_URL);
 
-        const filePath = path.resolve(__dirname, '../fixtures/sample.htm');
+        const filePath = path.resolve(__dirname, '../fixtures/small-file.htm');
         await page.locator('#fileInput').setInputFiles(filePath);
 
         await expect(page.locator('#dropArea')).toBeHidden({ timeout: 5000 });
@@ -38,7 +38,7 @@ test.describe('ファイル読み込み', () => {
     test('ファイル読み込み後にナビゲーションボタンが表示される', async ({ page }) => {
         await page.goto(APP_URL);
 
-        const filePath = path.resolve(__dirname, '../fixtures/sample.htm');
+        const filePath = path.resolve(__dirname, '../fixtures/small-file.htm');
         await page.locator('#fileInput').setInputFiles(filePath);
 
         await expect(page.locator('#nextDiffButton')).toBeVisible({ timeout: 5000 });
@@ -53,9 +53,9 @@ test.describe('差分ナビゲーション', () => {
 
     test.beforeEach(async ({ page }) => {
         await page.goto(APP_URL);
-        const filePath = path.resolve(__dirname, '../fixtures/sample.htm');
+        const filePath = path.resolve(__dirname, '../fixtures/small-file.htm');
         await page.locator('#fileInput').setInputFiles(filePath);
-        await expect(page.locator('table.diff')).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('#viewer table')).toBeVisible({ timeout: 5000 });
     });
 
     test('「次の差分」ボタンで差分にジャンプする', async ({ page }) => {
@@ -93,9 +93,9 @@ test.describe('キーボードショートカット', () => {
 
     test.beforeEach(async ({ page }) => {
         await page.goto(APP_URL);
-        const filePath = path.resolve(__dirname, '../fixtures/sample.htm');
+        const filePath = path.resolve(__dirname, '../fixtures/small-file.htm');
         await page.locator('#fileInput').setInputFiles(filePath);
-        await expect(page.locator('table.diff')).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('#viewer table')).toBeVisible({ timeout: 5000 });
 
         // setInputFiles() 実行後は #fileInput（<input>）自体にフォーカスが
         // 残ったままになる。handleKeydown() は誤操作防止のため input/textarea/
@@ -196,9 +196,9 @@ test.describe('リセット', () => {
 
     test('更新ボタンでドロップエリアに戻る', async ({ page }) => {
         await page.goto(APP_URL);
-        const filePath = path.resolve(__dirname, '../fixtures/sample.htm');
+        const filePath = path.resolve(__dirname, '../fixtures/small-file.htm');
         await page.locator('#fileInput').setInputFiles(filePath);
-        await expect(page.locator('table.diff')).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('#viewer table')).toBeVisible({ timeout: 5000 });
 
         await page.locator('#resetButton').click();
         await expect(page.locator('#dropArea')).toBeVisible({ timeout: 3000 });
