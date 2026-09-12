@@ -36,6 +36,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import DOMPurify from '../js/vendor/purify.es.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -276,6 +277,12 @@ describe('HTMLProcessor.importStyles()', () => {
         expect(AppState.importedStyleElem.textContent).not.toContain('behavior:');
     });
 
+    it('外部リソースを読み込む url(...) を含む style ブロック全体を破棄する', () => {
+        const doc = parseHTML('<html><head><style>div{background:url(https://evil.example/x)}</style></head></html>');
+        HTMLProcessor.importStyles(doc);
+        expect(AppState.importedStyleElem.textContent).toBe('');
+    });
+
     it('style タグがない場合は importedStyleElem が null のまま', () => {
         const doc = parseHTML('<html><head></head></html>');
         HTMLProcessor.importStyles(doc);
@@ -292,6 +299,26 @@ describe('HTMLProcessor.importStyles()', () => {
         HTMLProcessor.importStyles(doc);
         expect(AppState.importedStyleElem.textContent).toContain('.a');
         expect(AppState.importedStyleElem.textContent).toContain('.b');
+    });
+});
+
+// ========================================
+// HTMLProcessor.sanitize() - fail closed
+// ========================================
+describe('HTMLProcessor.sanitize() - DOMPurify失敗時', () => {
+    it('DOMPurifyが例外を投げた場合は未検証HTMLへフォールバックしない', () => {
+        const sanitizeSpy = vi.spyOn(DOMPurify, 'sanitize').mockImplementation(() => {
+            throw new Error('forced DOMPurify failure');
+        });
+
+        expect(() => HTMLProcessor.sanitize('<table><tr><td>未検証</td></tr></table>')).toThrow(
+            FileProcessingError
+        );
+        expect(() => HTMLProcessor.sanitize('<table><tr><td>未検証</td></tr></table>')).toThrow(
+            'HTMLの安全性を確認できないため、ファイルを表示できません。'
+        );
+
+        sanitizeSpy.mockRestore();
     });
 });
 
@@ -456,61 +483,61 @@ describe('HTMLProcessor.sanitize() - html/head/body 誤削除バグの回帰テ�
 });
 
 // ========================================
-// HTMLProcessor.sanitize() - 異常系・フォールバック
+// HTMLProcessor.sanitize() - 異常系・fail closed
 // ========================================
-describe('HTMLProcessor.sanitize() - 異常系・フォールバック', () => {
+describe('HTMLProcessor.sanitize() - 異常系・fail closed', () => {
     afterEach(() => {
         vi.restoreAllMocks();
     });
 
-    it('DOMParser の結果に documentElement が無い場合、strictBasicSanitize にフォールバックする', () => {
+    it('DOMParser の結果に documentElement が無い場合は表示を中止する', () => {
         vi.spyOn(DOMParser.prototype, 'parseFromString').mockReturnValueOnce({
             documentElement: null,
         });
 
-        const result = HTMLProcessor.sanitize('<script>alert(1)</script><div>ok</div>');
-        expect(result).not.toContain('<script');
-        expect(result).toContain('ok');
+        expect(() => HTMLProcessor.sanitize('<script>alert(1)</script><div>ok</div>')).toThrow(
+            FileProcessingError
+        );
     });
 
-    it('parseFromString が例外を投げた場合、catchされ strictBasicSanitize にフォールバックする', () => {
+    it('parseFromString が例外を投げた場合は表示を中止する', () => {
         vi.spyOn(DOMParser.prototype, 'parseFromString').mockImplementationOnce(() => {
             throw new Error('parse boom');
         });
 
-        const result = HTMLProcessor.sanitize('<script>alert(1)</script><div>ok</div>');
-        expect(result).not.toContain('<script');
-        expect(result).toContain('ok');
+        expect(() => HTMLProcessor.sanitize('<script>alert(1)</script><div>ok</div>')).toThrow(
+            FileProcessingError
+        );
     });
 
-    it('危険タグ（script）の removeChild が例外を投げても処理は継続する', () => {
+    it('危険タグ（script）の removeChild が例外を投げた場合は表示を中止する', () => {
         vi.spyOn(Element.prototype, 'removeChild').mockImplementationOnce(() => {
             throw new Error('removeChild boom');
         });
 
-        expect(() =>
-            HTMLProcessor.sanitize('<script>alert(1)</script><div>ok</div>')
-        ).not.toThrow();
+        expect(() => HTMLProcessor.sanitize('<script>alert(1)</script><div>ok</div>')).toThrow(
+            FileProcessingError
+        );
     });
 
-    it('アンラップ対象（a タグ）の insertBefore が例外を投げても処理は継続する', () => {
+    it('アンラップ対象（a タグ）の insertBefore が例外を投げた場合は表示を中止する', () => {
         vi.spyOn(Element.prototype, 'insertBefore').mockImplementationOnce(() => {
             throw new Error('insertBefore boom');
         });
 
-        expect(() =>
-            HTMLProcessor.sanitize('<div><a href="#">リンク</a></div>')
-        ).not.toThrow();
+        expect(() => HTMLProcessor.sanitize('<div><a href="#">リンク</a></div>')).toThrow(
+            FileProcessingError
+        );
     });
 
-    it('アンラップ対象（a タグ）の removeChild が例外を投げても処理は継続する', () => {
+    it('アンラップ対象（a タグ）の removeChild が例外を投げた場合は表示を中止する', () => {
         vi.spyOn(Element.prototype, 'removeChild').mockImplementationOnce(() => {
             throw new Error('removeChild boom');
         });
 
-        expect(() =>
-            HTMLProcessor.sanitize('<div><a href="#">リンク</a></div>')
-        ).not.toThrow();
+        expect(() => HTMLProcessor.sanitize('<div><a href="#">リンク</a></div>')).toThrow(
+            FileProcessingError
+        );
     });
 });
 
@@ -521,6 +548,6 @@ describe('HTMLProcessor.importStyles() - 追加ケース', () => {
     it('空の style タグでも例外が発生しない', () => {
         const doc = parseHTML('<html><head><style></style></head></html>');
         expect(() => HTMLProcessor.importStyles(doc)).not.toThrow();
-        expect(AppState.importedStyleElem.textContent).toBe('\n');
+        expect(AppState.importedStyleElem.textContent).toBe('');
     });
 });

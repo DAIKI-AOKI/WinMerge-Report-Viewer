@@ -16,7 +16,7 @@
 'use strict';
 import { CONFIG } from './config.js';
 import { AppState, Logger } from './state.js';
-import { TableProcessingError } from './errors.js';
+import { FileProcessingError, TableProcessingError } from './errors.js';
 import { TableProcessor } from './table-processor.js';
 import DOMPurify from './vendor/purify.es.js';
 
@@ -25,7 +25,11 @@ import DOMPurify from './vendor/purify.es.js';
 // importStyles()でのCSS安全化と同じ判定基準に揃えている。
 DOMPurify.addHook('uponSanitizeAttribute', (node, data) => {
     if (data.attrName === 'style' && data.attrValue) {
-        if (/expression\s*\(|javascript\s*:|vbscript\s*:|@import|behavior\s*:|binding\s*:/i.test(data.attrValue)) {
+        if (
+            /expression\s*\(|javascript\s*:|vbscript\s*:|@import|behavior\s*:|binding\s*:/i.test(
+                data.attrValue
+            )
+        ) {
             data.keepAttr = false;
         }
     }
@@ -59,15 +63,18 @@ const HTMLProcessor = {
             });
 
             if (!clean || !clean.trim()) {
-                Logger.warn('DOMPurify returned empty output, falling back to strict sanitize.');
-                return this.strictBasicSanitize(html);
+                throw new Error('DOMPurify returned empty output');
             }
 
             Logger.log('HTML sanitization completed successfully');
             return clean;
         } catch (error) {
             Logger.error('Sanitize error:', error);
-            return this.strictBasicSanitize(html);
+            throw new FileProcessingError(
+                'HTMLの安全性を確認できないため、ファイルを表示できません。',
+                'sanitize',
+                error
+            );
         }
     },
 
@@ -79,10 +86,13 @@ const HTMLProcessor = {
      * @returns {string} <style>タグ内のコメント記号だけを除去したHTML文字列
      */
     _stripStyleComments(html) {
-        return html.replace(/(<style[^>]*>)([\s\S]*?)(<\/style>)/gi, (match, open, content, close) => {
-            const cleaned = content.replace(/<!--/g, '').replace(/-->/g, '');
-            return open + cleaned + close;
-        });
+        return html.replace(
+            /(<style[^>]*>)([\s\S]*?)(<\/style>)/gi,
+            (match, open, content, close) => {
+                const cleaned = content.replace(/<!--/g, '').replace(/-->/g, '');
+                return open + cleaned + close;
+            }
+        );
     },
 
     /**
@@ -116,19 +126,24 @@ const HTMLProcessor = {
         AppState.importedStyleElem.setAttribute('data-imported', 'true');
         let css = '';
         styleNodes.forEach((s) => {
-            let styleContent = s.textContent || '';
-            // 念のため危険なCSS構文を除去
-            styleContent = styleContent
-                .replace(/expression\s*\(/gi, '')
-                .replace(/javascript\s*:/gi, '')
-                .replace(/vbscript\s*:/gi, '')
-                .replace(/@import/gi, '')
-                .replace(/behavior\s*:/gi, '')
-                .replace(/binding\s*:/gi, '');
-            css += styleContent + '\n';
+            const styleContent = this._sanitizeStyleText(s.textContent || '');
+            if (styleContent) css += styleContent + '\n';
         });
         AppState.importedStyleElem.textContent = css;
         document.head.appendChild(AppState.importedStyleElem);
+    },
+
+    /**
+     * 危険な構文を含むCSSブロックを丸ごと破棄する。
+     * CSSパーサーを導入していないため、外部リソース読み込みや旧式実行機能を
+     * 含むブロックは部分修正せず拒否する（fail closed）。
+     * @param {string} css - 検査対象のCSS
+     * @returns {string} 安全と判定したCSS、または空文字列
+     */
+    _sanitizeStyleText(css) {
+        const dangerousPattern =
+            /expression\s*\(|javascript\s*:|vbscript\s*:|@import|behavior\s*:|binding\s*:|url\s*\(/i;
+        return dangerousPattern.test(css) ? '' : css;
     },
 
     /**
