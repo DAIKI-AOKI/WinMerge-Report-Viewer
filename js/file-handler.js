@@ -374,11 +374,13 @@ const FileHandler = (() => {
      */
     async function _stepRender(progress) {
         progress.updateStepProgress('render', 0);
+
+        AppState.elements.prevDiffButton.onclick = jumpToPrevDiffEnhanced;
+        AppState.elements.nextDiffButton.onclick = jumpToNextDiffEnhanced;
+
         await Utils.sleep(CONFIG.PROGRESS_STEP_DELAY_MS);
 
         try {
-            AppState.elements.prevDiffButton.onclick = jumpToPrevDiffEnhanced;
-            AppState.elements.nextDiffButton.onclick = jumpToNextDiffEnhanced;
             progress.updateStepProgress('render', 50);
 
             CSSManager.hideElement(
