@@ -96,24 +96,6 @@ const HTMLProcessor = {
     },
 
     /**
-     * 厳格なサニタイズ（最終フォールバック）
-     * @param {string} html - サニタイズするHTML文字列
-     * @returns {string} サニタイズされたHTML
-     */
-    strictBasicSanitize(html) {
-        return html
-            .replace(/<script[\s\S]*?<\/script>/gi, '')
-            .replace(/<iframe[\s\S]*?<\/iframe>/gi, '')
-            .replace(/<object[\s\S]*?<\/object>/gi, '')
-            .replace(/<embed[\s\S]*?<\/embed>/gi, '')
-            .replace(/<form[\s\S]*?<\/form>/gi, '')
-            .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '')
-            .replace(/javascript\s*:/gi, '')
-            .replace(/vbscript\s*:/gi, '')
-            .replace(/data\s*:\s*text\/html/gi, '');
-    },
-
-    /**
      * スタイルをインポート
      * @param {Document} doc - DOMドキュメント
      * @returns {void}
@@ -129,8 +111,41 @@ const HTMLProcessor = {
             const styleContent = this._sanitizeStyleText(s.textContent || '');
             if (styleContent) css += styleContent + '\n';
         });
-        AppState.importedStyleElem.textContent = css;
+        AppState.importedStyleElem.textContent = this._scopeCss(css);
         document.head.appendChild(AppState.importedStyleElem);
+    },
+
+    /**
+     * WinMergeレポートのCSSをViewer領域に限定する。
+     * @param {string} css - 安全性検査済みのCSS
+     * @returns {string} #viewer 配下にスコープしたCSS
+     */
+    _scopeCss(css) {
+        // @import / url() 等は _sanitizeStyleText() で拒否済み。
+        // WinMergeの標準レポートは通常のスタイルルールのみで構成されるため、
+        // セレクター部分だけを #viewer 配下へ限定する。
+        return css.replace(/([^{}]+)\{/g, (match, selectorText) => {
+            const selector = selectorText.trim();
+            if (!selector || selector.startsWith('@')) return match;
+
+            const scoped = selector
+                .split(',')
+                .map((part) => {
+                    const trimmed = part.trim();
+                    if (!trimmed) return trimmed;
+                    if (/^(html|body|:root)$/i.test(trimmed)) return '#viewer';
+                    if (/^html\s+/i.test(trimmed)) {
+                        return '#viewer' + trimmed.replace(/^html/i, '');
+                    }
+                    if (/^body\s*/i.test(trimmed)) {
+                        return '#viewer' + trimmed.replace(/^body/i, '');
+                    }
+                    return '#viewer ' + trimmed;
+                })
+                .join(', ');
+
+            return scoped + ' {';
+        });
     },
 
     /**

@@ -9,12 +9,6 @@
  *     - href="javascript:" は除去される
  *     - 正常な HTML は文字列として返る
  *
- *   【strictBasicSanitize()】
- *     - script / iframe / object / embed / form タグが除去される
- *     - on〜属性が除去される
- *     - javascript: / vbscript: が除去される
- *     - data:text/html が除去される
- *     - 通常のテキストは残る
  *
  *   【importStyles()】
  *     - style タグの CSS が document.head に追加される
@@ -176,66 +170,6 @@ describe('HTMLProcessor.sanitize()', () => {
 });
 
 // ========================================
-// HTMLProcessor.strictBasicSanitize()
-// ========================================
-describe('HTMLProcessor.strictBasicSanitize()', () => {
-
-    it('script タグブロックが除去される', () => {
-        const result = HTMLProcessor.strictBasicSanitize('<script>alert(1)</script>本文');
-        expect(result).not.toContain('<script>');
-        expect(result).not.toContain('alert(1)');
-        expect(result).toContain('本文');
-    });
-
-    it('iframe タグブロックが除去される', () => {
-        const result = HTMLProcessor.strictBasicSanitize('<iframe src="x"></iframe>本文');
-        expect(result).not.toContain('iframe');
-        expect(result).toContain('本文');
-    });
-
-    it('object タグブロックが除去される', () => {
-        const result = HTMLProcessor.strictBasicSanitize('<object data="x"></object>');
-        expect(result).not.toContain('object');
-    });
-
-    it('embed タグブロックが除去される', () => {
-        const result = HTMLProcessor.strictBasicSanitize('<embed src="x"></embed>');
-        expect(result).not.toContain('embed');
-    });
-
-    it('form タグブロックが除去される', () => {
-        const result = HTMLProcessor.strictBasicSanitize('<form action="x"><input></form>');
-        expect(result).not.toContain('form');
-    });
-
-    it('on〜属性が除去される', () => {
-        const result = HTMLProcessor.strictBasicSanitize('<td onclick="evil()">セル</td>');
-        expect(result).not.toContain('onclick');
-    });
-
-    it('javascript: が除去される', () => {
-        const result = HTMLProcessor.strictBasicSanitize('href="javascript:evil()"');
-        expect(result).not.toContain('javascript:');
-    });
-
-    it('vbscript: が除去される', () => {
-        const result = HTMLProcessor.strictBasicSanitize('src="vbscript:evil"');
-        expect(result).not.toContain('vbscript:');
-    });
-
-    it('data:text/html が除去される', () => {
-        const result = HTMLProcessor.strictBasicSanitize('src="data:text/html,<script>evil()</script>"');
-        expect(result).not.toContain('data:text/html');
-    });
-
-    it('通常テキストはそのまま残る', () => {
-        const plain = '<table><tr><td>差分なし</td></tr></table>';
-        const result = HTMLProcessor.strictBasicSanitize(plain);
-        expect(result).toContain('差分なし');
-    });
-});
-
-// ========================================
 // HTMLProcessor.importStyles()
 // ========================================
 describe('HTMLProcessor.importStyles()', () => {
@@ -250,7 +184,7 @@ describe('HTMLProcessor.importStyles()', () => {
     it('CSS の内容が importedStyleElem に含まれる', () => {
         const doc = parseHTML('<html><head><style>.diff{background:yellow}</style></head></html>');
         HTMLProcessor.importStyles(doc);
-        expect(AppState.importedStyleElem.textContent).toContain('.diff');
+        expect(AppState.importedStyleElem.textContent).toContain('#viewer .diff');
     });
 
     it('expression( が除去される', () => {
@@ -289,6 +223,16 @@ describe('HTMLProcessor.importStyles()', () => {
         expect(AppState.importedStyleElem).toBeNull();
     });
 
+    it('WinMerge CSS のセレクターが #viewer 配下にスコープされる', () => {
+        const doc = parseHTML('<html><head><style>body{color:red} table{margin:0} .diff, td{background:yellow}</style></head></html>');
+        HTMLProcessor.importStyles(doc);
+        const css = AppState.importedStyleElem.textContent;
+        expect(css).toContain('#viewer {');
+        expect(css).toContain('#viewer table {');
+        expect(css).toContain('#viewer .diff, #viewer td {');
+        expect(css).not.toMatch(/(^|[}\n])\s*(body|table|\.diff|td)\s*\{/);
+    });
+
     it('複数の style タグがある場合はすべて結合される', () => {
         const doc = parseHTML(`
             <html><head>
@@ -297,8 +241,8 @@ describe('HTMLProcessor.importStyles()', () => {
             </head></html>
         `);
         HTMLProcessor.importStyles(doc);
-        expect(AppState.importedStyleElem.textContent).toContain('.a');
-        expect(AppState.importedStyleElem.textContent).toContain('.b');
+        expect(AppState.importedStyleElem.textContent).toContain('#viewer .a');
+        expect(AppState.importedStyleElem.textContent).toContain('#viewer .b');
     });
 });
 
@@ -406,10 +350,9 @@ describe('HTMLProcessor.removeImportedStyle()', () => {
 // HTMLProcessor.sanitize() - html/head/body 誤削除バグの回帰テスト
 // ========================================
 describe('HTMLProcessor.sanitize() - html/head/body 誤削除バグの回帰テスト', () => {
-    // NOTE: ALLOWED_TAGS に html/head/body が含まれていないため、
-    // 以前は <html> 自体が「許可されていないタグ」として削除され、
-    // doc.body が null になり、常に strictBasicSanitize() にフォールバックしていた。
-    // このテストはその再発を防止する。
+    // NOTE: ALLOWED_TAGS に html/head/body が含まれていないと、
+    // <html> 自体が「許可されていないタグ」として削除され、
+    // ドキュメント構造が壊れる。このテストはその再発を防止する。
 
     it('style タグ（<head>に配置される）と table タグ（<body>に配置される）が両方とも保持される', () => {
         const result = HTMLProcessor.sanitize(

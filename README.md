@@ -66,9 +66,9 @@ npx serve .
 │   └── vendor/
 │       └── purify.es.js      # DOMPurify（HTMLサニタイズライブラリ、同梱）
 └── tests/
-    ├── unit/                 # ユニットテスト（Vitest・Node 環境）
-    ├── dom/                  # DOM テスト（Vitest・jsdom 環境）
+    ├── *.test.js             # ユニット・DOMテスト（Vitest）
     ├── integration/          # 統合テスト（モジュール間連携）
+    ├── fixtures/              # テスト用WinMergeレポート
     └── e2e/                  # E2E テスト（Playwright）
 ```
 
