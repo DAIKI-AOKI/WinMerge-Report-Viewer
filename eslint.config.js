@@ -19,7 +19,10 @@ export default [
   },
   {
     // Vitest（Node.js環境で動くテストコード）
-    files: ['tests/unit/**/*.js', 'tests/dom/**/*.js', 'tests/integration/**/*.js'],
+    // tests/ 直下にフラット配置されたユニット・DOMテストと、tests/integration/ を対象にする。
+    // tests/e2e/ は下のPlaywright用ブロックで別途扱うため除外する。
+    files: ['tests/**/*.js'],
+    ignores: ['tests/e2e/**/*.js'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'module',
