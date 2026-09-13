@@ -494,3 +494,68 @@ describe('HTMLProcessor.importStyles() - 追加ケース', () => {
         expect(AppState.importedStyleElem.textContent).toBe('');
     });
 });
+
+// ========================================
+// HTMLProcessor._scopeCss() - CSSスコープエスケープ対策
+// ========================================
+// 参照: malicious-06-css-scope-escape.htm での実害報告
+//
+// _scopeCss() は html/body/:root セレクターを #viewer に読み替えるが、
+// #viewer はレポート内容を描画する実際のコンテナのidでもあるため、
+// 単純な文字列置換だけでは「html/bodyを非表示にする」攻撃が
+// 「#viewer（保護すべき表示領域そのもの）を非表示にする」攻撃に
+// そのまま変換されてしまう問題があった。
+describe('HTMLProcessor._scopeCss() - CSSスコープエスケープ対策', () => {
+    function runPipeline(rawHtml) {
+        const sanitized = HTMLProcessor.sanitize(rawHtml);
+        const doc = parseHTML(sanitized);
+        HTMLProcessor.importStyles(doc);
+        return AppState.importedStyleElem ? AppState.importedStyleElem.textContent : '';
+    }
+
+    it('malicious-06-css-scope-escape.htm と同じペイロードで #viewer 自体を隠せない', () => {
+        const raw = `<!DOCTYPE html>
+<html><head><title>WinMerge File Compare Report</title>
+<style type="text/css">
+<!--
+html, body, #viewer ~ * , #app { display: none !important; }
+button, input, .toolbar { visibility: hidden !important; }
+* { pointer-events: none !important; }
+.sf3b2 { color: #000000; background-color: #ffffff; }
+-->
+</style></head>
+<body><table><tr><td class="sf3b2">diff</td></tr></table></body></html>`;
+        const css = runPipeline(raw);
+        expect(css).not.toMatch(/#viewer\s*(:[\w-]+)?\s*\{[^}]*display\s*:\s*none/i);
+        expect(css).not.toMatch(/#viewer\s*(:[\w-]+)?\s*\{[^}]*visibility\s*:\s*hidden/i);
+        // 無害な装飾ルール(色指定)はそのまま機能する
+        expect(css).toContain('.sf3b2');
+    });
+
+    it('html, body { display:none } は #viewer に対して display を適用しない', () => {
+        const css = runPipeline('<html><head><style>html, body { display: none; }</style></head><body></body></html>');
+        expect(css).not.toMatch(/display\s*:\s*none/i);
+    });
+
+    it(':root { visibility: hidden } も同様にブロックされる', () => {
+        const css = runPipeline('<html><head><style>:root { visibility: hidden; }</style></head><body></body></html>');
+        expect(css).not.toMatch(/visibility\s*:\s*hidden/i);
+    });
+
+    it('疑似クラス付き body:hover{display:none} も #viewer 自身は隠せない', () => {
+        const css = runPipeline('<html><head><style>body:hover{display:none;color:blue}</style></head><body></body></html>');
+        expect(css).not.toMatch(/display\s*:\s*none/i);
+        expect(css).toContain('#viewer:hover');
+        expect(css).toContain('color:blue');
+    });
+
+    it('#viewer を子孫として辿る通常セレクターは引き続き display 等を使える（誤検知しない）', () => {
+        const css = runPipeline('<html><head><style>div{display:none}</style></head><body></body></html>');
+        expect(css).toContain('#viewer div {display:none}');
+    });
+
+    it('危険プロパティを含まない body ルールは従来どおり #viewer にスコープされる（既存挙動の回帰なし）', () => {
+        const css = runPipeline('<html><head><style>body{color:red;font-family:Arial}</style></head><body></body></html>');
+        expect(css).toContain('#viewer {color:red;font-family:Arial}');
+    });
+});

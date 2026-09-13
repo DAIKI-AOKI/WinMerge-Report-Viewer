@@ -116,6 +116,75 @@ const HTMLProcessor = {
     },
 
     /**
+     * html/body/:root を #viewer に読み替えた結果、そのルールが
+     * 「#viewer要素そのもの」を（コンビネータを介さず直接）選択しうるかどうかを判定する。
+     * 例: "#viewer", "#viewer:hover", "#viewer::before", "#viewer[data-x]" → true
+     *     "#viewer div", "#viewer > div", "#viewer.foo" 相当のコンビネータ付きは false
+     * #viewer自体が選択される場合、display/visibility等でビューア表示領域そのものを
+     * 消し去られてしまうため、そうしたプロパティだけは別途除去する。
+     * @private
+     * @param {string} scopedSelector - スコープ変換後の単一セレクター
+     * @returns {boolean}
+     */
+    _isViewerRootSelector(scopedSelector) {
+        // スペース／子・隣接・一般兄弟コンビネータが含まれていれば「#viewer自身」ではなく
+        // その配下・周辺の別要素を指すセレクターなので対象外。
+        if (/[\s>+~]/.test(scopedSelector)) return false;
+        // 単一コンパウンドセレクターとして #viewer から始まっているか
+        // （疑似クラス・疑似要素・属性セレクターの付加は許容し、依然として#viewer自身を指す）
+        return /^#viewer(?:$|[:.[])/.test(scopedSelector);
+    },
+
+    /**
+     * #viewer要素そのものに対して、表示・操作を無効化しうるプロパティだけを
+     * 宣言ブロックから除去する（それ以外の装飾プロパティはそのまま残す）。
+     * @private
+     * @param {string} declText - `{` と `}` の間の宣言ブロック文字列
+     * @returns {string} 危険なプロパティを除去した宣言ブロック文字列
+     */
+    _stripViewerHidingDeclarations(declText) {
+        const DANGEROUS_PROPS = new Set([
+            'display',
+            'visibility',
+            'opacity',
+            'pointer-events',
+            'clip',
+            'clip-path',
+            'transform',
+            'filter',
+            'position',
+            'top',
+            'left',
+            'right',
+            'bottom',
+            'z-index',
+            'width',
+            'height',
+            'min-width',
+            'min-height',
+            'max-width',
+            'max-height',
+            'overflow',
+            'overflow-x',
+            'overflow-y',
+        ]);
+
+        return declText
+            .split(';')
+            .filter((decl) => {
+                const propMatch = decl.split(':')[0];
+                if (propMatch === undefined) return true;
+                // ベンダープレフィックス（-webkit-transform 等）を剥がして判定する
+                const prop = propMatch
+                    .trim()
+                    .toLowerCase()
+                    .replace(/^-[a-z]+-/, '');
+                return !DANGEROUS_PROPS.has(prop);
+            })
+            .join(';');
+    },
+
+    /**
      * WinMergeレポートのCSSをViewer領域に限定する。
      * @param {string} css - 安全性検査済みのCSS
      * @returns {string} #viewer 配下にスコープしたCSS
@@ -124,27 +193,54 @@ const HTMLProcessor = {
         // @import / url() 等は _sanitizeStyleText() で拒否済み。
         // WinMergeの標準レポートは通常のスタイルルールのみで構成されるため、
         // セレクター部分だけを #viewer 配下へ限定する。
-        return css.replace(/([^{}]+)\{/g, (match, selectorText) => {
+        // ここでは宣言ブロック（{ と } の間）も併せて取得し、html/body/:root 由来で
+        // #viewer要素そのものを指してしまうセレクターについては、表示/操作を無効化
+        // しうるプロパティだけを追加で除去する（CSSスコープエスケープ対策）。
+        return css.replace(/([^{}]+)\{([^{}]*)\}/g, (match, selectorText, declText) => {
             const selector = selectorText.trim();
             if (!selector || selector.startsWith('@')) return match;
 
-            const scoped = selector
-                .split(',')
-                .map((part) => {
-                    const trimmed = part.trim();
-                    if (!trimmed) return trimmed;
-                    if (/^(html|body|:root)$/i.test(trimmed)) return '#viewer';
-                    if (/^html\s+/i.test(trimmed)) {
-                        return '#viewer' + trimmed.replace(/^html/i, '');
-                    }
-                    if (/^body\s*/i.test(trimmed)) {
-                        return '#viewer' + trimmed.replace(/^body/i, '');
-                    }
-                    return '#viewer ' + trimmed;
-                })
-                .join(', ');
+            const normalSelectors = [];
+            const restrictedRules = [];
 
-            return scoped + ' {';
+            selector.split(',').forEach((part) => {
+                const trimmed = part.trim();
+                if (!trimmed) return;
+
+                let scoped;
+                if (/^(html|body|:root)$/i.test(trimmed)) {
+                    scoped = '#viewer';
+                } else if (/^html\s+/i.test(trimmed)) {
+                    scoped = '#viewer' + trimmed.replace(/^html/i, '');
+                } else if (/^body\s*/i.test(trimmed)) {
+                    scoped = '#viewer' + trimmed.replace(/^body/i, '');
+                } else {
+                    scoped = '#viewer ' + trimmed;
+                }
+
+                if (this._isViewerRootSelector(scoped)) {
+                    const filtered = this._stripViewerHidingDeclarations(declText);
+                    if (filtered.trim() === declText.trim()) {
+                        // 危険なプロパティを含まないので通常どおり結合してよい
+                        normalSelectors.push(scoped);
+                    } else if (filtered.trim()) {
+                        // 一部のプロパティのみ除去したものを個別ルールとして出力する
+                        restrictedRules.push(`${scoped} {${filtered}}`);
+                    }
+                    // filtered が空文字列 = 危険なプロパティしかなかったのでルール自体を破棄
+                } else {
+                    normalSelectors.push(scoped);
+                }
+            });
+
+            let result = '';
+            if (normalSelectors.length) {
+                result += normalSelectors.join(', ') + ' {' + declText + '}';
+            }
+            if (restrictedRules.length) {
+                result += (result ? '\n' : '') + restrictedRules.join('\n');
+            }
+            return result;
         });
     },
 
