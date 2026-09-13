@@ -58,7 +58,8 @@ npx serve .
 │   ├── file-handler.js       # ファイル読み込み・処理オーケストレーター
 │   ├── html-processor.js     # HTML サニタイズ・スタイルインポート
 │   ├── table-processor.js    # 差分テーブル処理・固定ヘッダー
-│   ├── diff-detector.js      # 差分ブロック検出・ミニマップマーカー生成
+│   ├── diff-detector.js      # 差分ブロック検出
+│   ├── block-marker-generator.js # ミニマップマーカー生成・ジャンプ操作
 │   ├── navigation.js         # 差分ナビゲーション・リセット
 │   ├── progress-indicator.js # プログレス表示
 │   ├── ui.js                 # UI 表示制御

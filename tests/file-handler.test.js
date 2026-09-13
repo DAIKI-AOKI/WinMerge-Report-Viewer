@@ -40,7 +40,8 @@
 
 import { UI } from '../js/ui.js';
 import { Navigation } from '../js/navigation.js';
-import { BlockMarkerGenerator, DiffBlockDetector } from '../js/diff-detector.js';
+import { DiffBlockDetector } from '../js/diff-detector.js';
+import { BlockMarkerGenerator } from '../js/block-marker-generator.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { HTMLProcessor } from '../js/html-processor.js';
 import { TableProcessor } from '../js/table-processor.js';

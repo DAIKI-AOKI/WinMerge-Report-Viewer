@@ -1,7 +1,7 @@
 /**
  * FileHandler - ファイル処理モジュール（エラーハンドリング改善版）
  * 依存: config.js, state.js, utils.js, errors.js, error-handler.js, ui.js,
- *       html-processor.js, table-processor.js, diff-detector.js, navigation.js,
+ *       html-processor.js, table-processor.js, diff-detector.js, block-marker-generator.js, navigation.js,
  *       progress-indicator.js
  *
  * @fileoverview ファイルの検証、読み込み、処理の管理
@@ -21,7 +21,8 @@ import { ErrorHandler } from './error-handler.js';
 import { UI } from './ui.js';
 import { HTMLProcessor } from './html-processor.js';
 import { TableProcessor } from './table-processor.js';
-import { DiffBlockDetector, BlockMarkerGenerator } from './diff-detector.js';
+import { DiffBlockDetector } from './diff-detector.js';
+import { BlockMarkerGenerator } from './block-marker-generator.js';
 import { Navigation } from './navigation.js';
 import { ProgressIndicator } from './progress-indicator.js';
 

@@ -30,7 +30,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventManager } from '../../js/event-manager.js';
 import { Navigation } from '../../js/navigation.js';
 import { FileHandler } from '../../js/file-handler.js';
-import { BlockMarkerGenerator } from '../../js/diff-detector.js';
+import { BlockMarkerGenerator } from '../../js/block-marker-generator.js';
 import { HTMLProcessor } from '../../js/html-processor.js';
 import { UI } from '../../js/ui.js';
 

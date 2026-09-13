@@ -1,8 +1,8 @@
 /**
- * diff-detector.js - BlockMarkerGenerator のユニットテスト
+ * block-marker-generator.js - BlockMarkerGenerator のユニットテスト
  */
 
-import { BlockMarkerGenerator } from '../js/diff-detector.js';
+import { BlockMarkerGenerator } from '../js/block-marker-generator.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ========================================

@@ -1,6 +1,6 @@
 /**
  * Navigation - ナビゲーション制御モジュール（メモリリーク完全対策版）
- * 依存: config.js, state.js, utils.js, ui.js, html-processor.js, diff-detector.js
+ * 依存: config.js, state.js, utils.js, ui.js, html-processor.js, block-marker-generator.js
  *
  * @fileoverview ナビゲーション機能とクリーンアップ処理
  */
@@ -11,7 +11,7 @@ import { AppState, Logger } from './state.js';
 import { CSSManager } from './utils.js';
 import { UI } from './ui.js';
 import { HTMLProcessor } from './html-processor.js';
-import { BlockMarkerGenerator } from './diff-detector.js';
+import { BlockMarkerGenerator } from './block-marker-generator.js';
 
 const Navigation = (() => {
     /**

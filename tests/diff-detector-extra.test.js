@@ -2,7 +2,7 @@
  * diff-detector.js 追加テスト
  * cleanupDelegation / updateBlockHighlight をカバー
  */
-import { BlockMarkerGenerator } from '../js/diff-detector.js';
+import { BlockMarkerGenerator } from '../js/block-marker-generator.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 afterEach(() => {
