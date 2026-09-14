@@ -6,6 +6,7 @@ on:
     paths:
       - 'index.html'
       - 'document.html'
+      - 'document-dev.html'
       - 'style.css'
       - 'favicon.ico'
       - 'js/**'
@@ -45,7 +46,7 @@ jobs:
         # 動かすために必要な静的ファイルのみを配置する
         run: |
           mkdir -p pages-dist/js
-          cp index.html document.html style.css favicon.ico pages-dist/
+          cp index.html document.html document-dev.html style.css favicon.ico pages-dist/
           cp js/*.js pages-dist/js/
           mkdir -p pages-dist/js/vendor
           cp js/vendor/purify.es.js pages-dist/js/vendor/
