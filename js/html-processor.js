@@ -143,6 +143,9 @@ const HTMLProcessor = {
      * @returns {string} 危険なプロパティを除去した宣言ブロック文字列
      */
     _stripViewerHidingDeclarations(declText) {
+        // NOTE: `all: unset` / `all: initial` 等のショートハンドは意図的にブロックリストに
+        // 含めていない。これらは値を「初期状態」に戻す方向にのみ働き、display を none にする
+        // 効果は持たないため、#viewer を非表示にする攻撃の再現経路にはならない。
         const DANGEROUS_PROPS = new Set([
             'display',
             'visibility',

@@ -458,6 +458,62 @@ describe('TableProcessor.setupFixedHeader() - aria-*/data-* 属性', () => {
 });
 
 // ========================================
+// setupFixedHeader() - サニタイズ済み実データでの到達性（カナリア）
+// ========================================
+// DOMPurify は ALLOW_ARIA_ATTR / ALLOW_DATA_ATTR がデフォルト true のため、
+// CONFIG.ALLOWED_ATTR に明示的に含めていなくても aria-* / data-* は
+// sanitize() を通過して setupFixedHeader() まで到達する。
+// このテストは、その到達性の前提（＝この関数のサニタイズが両者にとって
+// 実質的な最終防御であるという前提）が将来のDOMPurify設定変更等で
+// 崩れていないかを検知するためのガード。
+describe('TableProcessor.setupFixedHeader() - サニタイズ済み実データでの到達性', () => {
+    it('sanitize()を通したHTMLでも aria-* 属性は残り、200文字以上の値は setupFixedHeader で除去される', () => {
+        const longValue = 'x'.repeat(250);
+        const raw = `<html><body><table><tr><th aria-label="${longValue}">A</th></tr></table></body></html>`;
+        const clean = HTMLProcessor.sanitize(raw);
+        const doc = new DOMParser().parseFromString(clean, 'text/html');
+        const table = doc.querySelector('table');
+
+        // sanitize() の時点では aria-* が残っていることを確認
+        expect(table.querySelector('th').getAttribute('aria-label')).toBe(longValue);
+
+        TableProcessor.setupFixedHeader(table);
+
+        const newTh = AppState.elements.fixedHeader.querySelector('th');
+        expect(newTh.hasAttribute('aria-label')).toBe(false);
+    });
+
+    it('sanitize()を通したHTMLでも data-* 属性は残り、200文字以上の値は setupFixedHeader で除去される', () => {
+        const longValue = 'x'.repeat(250);
+        const raw = `<html><body><table><tr><th data-x="${longValue}">A</th></tr></table></body></html>`;
+        const clean = HTMLProcessor.sanitize(raw);
+        const doc = new DOMParser().parseFromString(clean, 'text/html');
+        const table = doc.querySelector('table');
+
+        // sanitize() の時点では data-* が残っていることを確認
+        expect(table.querySelector('th').getAttribute('data-x')).toBe(longValue);
+
+        TableProcessor.setupFixedHeader(table);
+
+        const newTh = AppState.elements.fixedHeader.querySelector('th');
+        expect(newTh.hasAttribute('data-x')).toBe(false);
+    });
+
+    it('200文字未満の data-* 属性値は setupFixedHeader で保持される', () => {
+        const shortValue = 'x'.repeat(50);
+        const raw = `<html><body><table><tr><th data-x="${shortValue}">A</th></tr></table></body></html>`;
+        const clean = HTMLProcessor.sanitize(raw);
+        const doc = new DOMParser().parseFromString(clean, 'text/html');
+        const table = doc.querySelector('table');
+
+        TableProcessor.setupFixedHeader(table);
+
+        const newTh = AppState.elements.fixedHeader.querySelector('th');
+        expect(newTh.getAttribute('data-x')).toBe(shortValue);
+    });
+});
+
+// ========================================
 // updateFixedHeaderPosition() - fixedThs が originalThs より少ないケース
 // ========================================
 describe('TableProcessor.updateFixedHeaderPosition() - th数の不一致', () => {

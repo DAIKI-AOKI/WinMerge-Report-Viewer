@@ -27,6 +27,32 @@ const TableProcessor = (() => {
         });
     }
 
+    const MAX_COPIED_ATTR_VALUE_LENGTH = 200;
+
+    /**
+     * 固定ヘッダー用に複製するth属性値の防御的サニタイズ（defense-in-depth）。
+     *
+     * NOTE: 複製元の originalTh はすでに DOMPurify（CONFIG.ALLOWED_ATTR）を
+     * 通過済みである。CONFIG.ALLOWED_ATTR には 'aria-*'/'data-*' を明示的に
+     * 含めていないが、DOMPurify は ALLOW_ARIA_ATTR / ALLOW_DATA_ATTR が
+     * デフォルト true のため、ALLOWED_ATTR の指定に関わらず aria-* と data-*
+     * は個別の仕組みで許可され、この関数まで到達する。したがって、この関数の
+     * サニタイズ・長さ制限が両者にとって実質的な最終防御となる。
+     * @private
+     * @param {string} value - 元の属性値
+     * @returns {string} サニタイズ後の属性値（空文字なら「値なし」の意）
+     */
+    function _sanitizeAttrValueForCopy(value) {
+        const sanitized = value
+            .replace(/[<>'"]/g, '')
+            .replace(/javascript:/gi, '')
+            .replace(/on\w+/gi, '')
+            .trim();
+        return sanitized.length > 0 && sanitized.length < MAX_COPIED_ATTR_VALUE_LENGTH
+            ? sanitized
+            : '';
+    }
+
     /**
      * 固定ヘッダーをセットアップ
      * @param {HTMLTableElement} table - 元のテーブル
@@ -36,35 +62,25 @@ const TableProcessor = (() => {
         const firstRow = table.querySelector('tr');
         if (!firstRow) return;
 
+        const COPYABLE_ATTR_NAMES = ['class', 'colspan', 'rowspan'];
+
         AppState.elements.fixedHeaderRow.innerHTML = '';
         firstRow.querySelectorAll('th').forEach((originalTh) => {
             const newTh = document.createElement('th');
             newTh.textContent = originalTh.textContent;
 
-            const allowedAttributes = ['class', 'colspan', 'rowspan'];
-            allowedAttributes.forEach((attrName) => {
-                if (originalTh.hasAttribute(attrName)) {
-                    const attrValue = originalTh.getAttribute(attrName);
-                    const sanitizedValue = attrValue
-                        .replace(/[<>'"]/g, '')
-                        .replace(/javascript:/gi, '')
-                        .replace(/on\w+/gi, '')
-                        .trim();
-                    if (sanitizedValue && sanitizedValue.length < 200) {
-                        newTh.setAttribute(attrName, sanitizedValue);
-                    }
+            Array.from(originalTh.attributes).forEach((attr) => {
+                const isNamedAllowed = COPYABLE_ATTR_NAMES.includes(attr.name);
+                const isAriaOrData = attr.name.startsWith('aria-') || attr.name.startsWith('data-');
+                if (!isNamedAllowed && !isAriaOrData) return;
+
+                const sanitizedValue = _sanitizeAttrValueForCopy(attr.value);
+                if (sanitizedValue) {
+                    newTh.setAttribute(attr.name, sanitizedValue);
                 }
             });
 
             newTh.setAttribute('scope', 'col');
-
-            Array.from(originalTh.attributes).forEach((attr) => {
-                if (attr.name.startsWith('aria-') || attr.name.startsWith('data-')) {
-                    let attrValue = attr.value;
-                    const sanitizedValue = attrValue.replace(/[<>'"]/g, '').trim();
-                    newTh.setAttribute(attr.name, sanitizedValue);
-                }
-            });
 
             AppState.elements.fixedHeaderRow.appendChild(newTh);
         });
