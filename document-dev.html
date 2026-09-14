@@ -196,6 +196,9 @@
                 <a href="#module-structure"><i class="fas fa-sitemap"></i>モジュール構成</a>
             </div>
             <div class="toc-item">
+                <a href="#security"><i class="fas fa-lock"></i>セキュリティ設計</a>
+            </div>
+            <div class="toc-item">
                 <a href="#data-flow"><i class="fas fa-stream"></i>データフロー</a>
             </div>
             <div class="toc-item">
@@ -211,7 +214,7 @@
                 <a href="#privacy"><i class="fas fa-shield-alt"></i>データの取り扱い</a>
             </div>
             <div class="toc-item">
-                <a href="#branch-strategy"><i class="fas fa-code-branch"></i>ブランチ戦略</a>
+                <a href="#branch-strategy"><i class="fas fa-code-branch"></i>CI/CD・デプロイ</a>
             </div>
         </div>
     </div>
@@ -226,11 +229,16 @@
             <tbody>
                 <tr><td>言語</td><td>Vanilla JavaScript (ES6+)</td><td>フレームワーク不使用</td></tr>
                 <tr><td>モジュール</td><td>ES Modules (import/export)</td><td>type="module" で読み込み</td></tr>
-                <tr><td>セキュリティ</td><td>DOMParser + CSP</td><td>Content Security Policy をメタタグで設定</td></tr>
+                <tr><td>サニタイズ</td><td>DOMPurify 3.x</td><td>信頼できないHTMLを無害化。npm版を <code>js/vendor/</code> にベンダリングしCDN非依存化（<code>npm run sync:dompurify</code>）</td></tr>
+                <tr><td>ブラウザ側防御</td><td>CSP + SRI</td><td>index.html のメタタグで script-src 等を制限。Font Awesome は SRI ハッシュ付きで読み込み</td></tr>
                 <tr><td>UI アイコン</td><td>Font Awesome 6.4.0</td><td>CDN 経由（SRI ハッシュ付き）</td></tr>
-                <tr><td>ユニットテスト</td><td>Vitest 2.x + jsdom</td><td>Layer 1（Node）/ Layer 2（jsdom）環境分離</td></tr>
+                <tr><td>ユニット・統合テスト</td><td>Vitest 2.x + jsdom</td><td>jsdom（仮想DOM）上で各モジュール・モジュール間連携を検証</td></tr>
                 <tr><td>E2E テスト</td><td>Playwright</td><td>Chromium で自動実行</td></tr>
-                <tr><td>CI/CD</td><td>GitHub Actions</td><td>Node.js 22 LTS・main ブランチへの push で自動実行</td></tr>
+                <tr><td>静的解析</td><td>ESLint / Stylelint</td><td>JS・CSSの構文エラー／アンチパターンを検出</td></tr>
+                <tr><td>コード整形</td><td>Prettier</td><td>ESLint/Stylelintとは別に、コードの見た目（改行・インデント等）を統一</td></tr>
+                <tr><td>コミットフック</td><td>Husky + lint-staged</td><td>git commit 時にステージ済みファイルのみ自動lint・整形</td></tr>
+                <tr><td>依存関係管理</td><td>Dependabot</td><td>npm依存パッケージの更新PRを週次で自動作成</td></tr>
+                <tr><td>CI/CD</td><td>GitHub Actions</td><td>Node.js 22・push/PR毎に自動テスト、main反映時にGitHub Pagesへ自動デプロイ（詳細は「CI/CD・デプロイ」章）</td></tr>
             </tbody>
         </table>
         <div class="back-to-top"><a href="#top"><i class="fas fa-chevron-up"></i>トップへ戻る</a></div>
@@ -273,7 +281,7 @@
                 <tr>
                     <td><code>event-manager.js</code></td>
                     <td>イベントリスナー管理・ドラッグ&ドロップ</td>
-                    <td>config.js, state.js, file-handler.js, navigation.js</td>
+                    <td>config.js, state.js, utils.js, file-handler.js, navigation.js</td>
                 </tr>
                 <tr>
                     <td><code>file-handler.js</code></td>
@@ -283,7 +291,7 @@
                 <tr>
                     <td><code>html-processor.js</code></td>
                     <td>HTML サニタイズ・スタイルインポート</td>
-                    <td>config.js, state.js, errors.js, table-processor.js</td>
+                    <td>config.js, state.js, errors.js, table-processor.js, vendor/purify.es.js（DOMPurify）</td>
                 </tr>
                 <tr>
                     <td><code>table-processor.js</code></td>
@@ -292,13 +300,18 @@
                 </tr>
                 <tr>
                     <td><code>diff-detector.js</code></td>
-                    <td>差分ブロック検出・ミニマップマーカー生成</td>
-                    <td>config.js, state.js, utils.js, table-processor.js</td>
+                    <td>差分ブロック検出（行の背景色からブロック単位にグルーピング）</td>
+                    <td>config.js, state.js, table-processor.js</td>
+                </tr>
+                <tr>
+                    <td><code>block-marker-generator.js</code></td>
+                    <td>ミニマップマーカーの生成・クリック/キーボードでのジャンプ・ハイライト表示</td>
+                    <td>config.js, state.js, utils.js</td>
                 </tr>
                 <tr>
                     <td><code>navigation.js</code></td>
                     <td>差分ナビゲーション・インターフェースリセット</td>
-                    <td>config.js, state.js, utils.js, ui.js, html-processor.js, diff-detector.js</td>
+                    <td>config.js, state.js, utils.js, ui.js, html-processor.js, block-marker-generator.js</td>
                 </tr>
                 <tr>
                     <td><code>progress-indicator.js</code></td>
@@ -319,10 +332,53 @@
         </table>
 
         <div class="warning-box">
-            <strong><i class="fas fa-exclamation-triangle"></i> _legacy/ について</strong><br>
-            <code>_legacy/marker-manager.js</code> は行単位マーカー機能（削除済み）の残骸です。
-            どのモジュールからも import されておらず、<code>AppState.diffRows</code> 等の削除済みプロパティを参照するため、
-            import・実行すると即座にエラーになります。参照禁止。
+            <strong><i class="fas fa-exclamation-triangle"></i> 旧 MarkerManager（行単位マーカー）について</strong><br>
+            行単位でマーカーを打つ旧実装 <code>MarkerManager</code> は v2 で廃止され、
+            現在はリポジトリから完全に削除されています（<code>_legacy/</code> ディレクトリ自体も存在しません）。
+            ブロック単位でグルーピングして表示する <code>BlockMarkerGenerator</code>（<code>block-marker-generator.js</code>）に
+            置き換わっています。<code>tests/marker-manager.test.js</code> は移行の記録として残された
+            スキップ専用のプレースホルダーテストです。
+        </div>
+        <div class="back-to-top"><a href="#top"><i class="fas fa-chevron-up"></i>トップへ戻る</a></div>
+    </div>
+
+    <!-- セキュリティ設計 -->
+    <div class="section-box" id="security">
+        <h2><i class="fas fa-lock mr-0_5rem"></i>セキュリティ設計（多層防御）</h2>
+        <p>
+            本アプリは WinMerge が生成した「信頼できない HTML ファイル」をブラウザ内で直接レンダリングするため、
+            XSS 対策が最重要の設計要素です。<code>html-processor.js</code> を中心に、以下の防御を積み重ねています。
+        </p>
+        <table>
+            <thead>
+                <tr><th>層</th><th>対策</th><th>実装箇所</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>1</td><td>mutation XSS 対策：&lt;style&gt;タグ内のコメント記法（<code>&lt;!-- --&gt;</code>）を事前に除去</td><td><code>_stripStyleComments()</code></td></tr>
+                <tr><td>2</td><td>DOMPurify によるホワイトリスト方式のサニタイズ（<code>script</code>/<code>iframe</code>等の危険タグ、<code>on*</code>属性等を除去）</td><td><code>CONFIG.ALLOWED_TAGS</code> / <code>ALLOWED_ATTR</code></td></tr>
+                <tr><td>3</td><td>style属性内の危険パターン検査（<code>javascript:</code> / <code>expression()</code> / <code>@import</code> / <code>binding:</code> 等）</td><td><code>uponSanitizeAttribute</code>フック</td></tr>
+                <tr><td>4</td><td>&lt;style&gt;タグ全体に対する同様のパターン検査。検出時はブロック単位で丸ごと拒否（fail-closed）</td><td><code>_sanitizeStyleText()</code></td></tr>
+                <tr><td>5</td><td>レポートのCSSを <code>#viewer</code> 配下にスコープ化。<code>html</code>/<code>body</code>/<code>:root</code>が<code>#viewer</code>自身を直接指してしまうケースでは、<code>display</code>/<code>visibility</code>等「表示を消し去るプロパティ」だけを追加で除去する</td><td><code>_scopeCss()</code></td></tr>
+            </tbody>
+        </table>
+        <div class="info-box">
+            さらにブラウザ側の防御として、<code>index.html</code>のCSP（Content-Security-Policy）で
+            <code>script-src</code>を自ドメインとFont AwesomeのCDNのみに制限し、外部への不要な接続や
+            インラインスクリプトの実行を防いでいます。DOMPurify本体もCDNではなく<code>js/vendor/</code>に
+            ベンダリングしているため、外部スクリプト読み込みへの依存自体を減らしています。
+        </div>
+        <p>
+            加えて、DOMを構築する全モジュールで「ユーザー由来のテキストは<code>textContent</code>のみで挿入し、
+            <code>innerHTML</code>には動的な値を渡さない」という方針が徹底されています。これはDOMPurifyの
+            サニタイズが万一漏れた場合の「もう一段の砦」として機能します。
+        </p>
+        <div class="warning-box">
+            <strong>⚠ CSSスコープエスケープの脆弱性修正（実例）</strong><br>
+            過去に、悪意あるCSSで<code>html, body { display: none }</code>のようなルールを仕込むと、
+            スコープ化後に<code>#viewer, #viewer { display: none }</code>となり、ビューア表示領域そのものが
+            消し去られてしまう脆弱性が報告されました。<code>_isViewerRootSelector()</code>で
+            「コンビネータを介さず<code>#viewer</code>自身を指すセレクターか」を判定し、該当する場合のみ
+            表示制御系プロパティを除去する対策が現在の実装（上表の層5）です。
         </div>
         <div class="back-to-top"><a href="#top"><i class="fas fa-chevron-up"></i>トップへ戻る</a></div>
     </div>
@@ -338,12 +394,17 @@
             <tbody>
                 <tr><td>read</td><td>FileReader でファイルを読み込み・文字コード判定（UTF-8 / Shift-JIS）</td><td>file-handler.js</td><td>0〜20%</td></tr>
                 <tr><td>sanitize</td><td>HTML をサニタイズ（危険タグ・属性を除去）</td><td>html-processor.js</td><td>20〜40%</td></tr>
-                <tr><td>parse</td><td>DOMParser で差分テーブルを抽出・スタイルをインポート</td><td>html-processor.js</td><td>40〜50%</td></tr>
-                <tr><td>detect</td><td>差分ブロックを検出し <code>AppState.diffBlocks</code> に格納</td><td>diff-detector.js</td><td>50〜70%</td></tr>
-                <tr><td>marker</td><td>ミニマップマーカーを左右ペインに生成・配置</td><td>diff-detector.js</td><td>70〜90%</td></tr>
-                <tr><td>render</td><td>テーブルを DOM に挿入・ナビゲーションボタンを設定</td><td>file-handler.js</td><td>90〜100%</td></tr>
+                <tr><td>parse</td><td>DOMParser で Document を生成し、&lt;style&gt;タグのCSSを <code>#viewer</code> 配下にインポート</td><td>html-processor.js</td><td>40〜50%</td></tr>
+                <tr><td>detect</td><td>差分テーブルを抽出・複製し、右端バーを付与して viewer に挿入</td><td>html-processor.js（内部で table-processor.js を利用）</td><td>50〜70%</td></tr>
+                <tr><td>marker</td><td>固定ヘッダー生成 → 差分ブロック検出 → ミニマップマーカーを左右ペインに生成・配置</td><td>table-processor.js / diff-detector.js / block-marker-generator.js</td><td>70〜90%</td></tr>
+                <tr><td>render</td><td>ナビゲーションボタンを接続し、ツールヘッダーを非表示化</td><td>file-handler.js</td><td>90〜100%</td></tr>
             </tbody>
         </table>
+        <div class="info-box">
+            ステップ名「detect」は差分<strong>テーブル</strong>の検出を指し、差分<strong>ブロック</strong>の検出
+            （<code>DiffBlockDetector.detectBlocks()</code>）は次の「marker」ステップの中で行われます。
+            ステップ名と実処理の対応が直感的でない箇所なので、コードを追う際は注意してください。
+        </div>
         <div class="back-to-top"><a href="#top"><i class="fas fa-chevron-up"></i>トップへ戻る</a></div>
     </div>
 
@@ -387,15 +448,9 @@
             <tbody>
                 <tr>
                     <td>ユニットテスト</td>
-                    <td><code>tests/unit/</code></td>
+                    <td><code>tests/*.test.js</code>（モジュールごとにフラット配置、21ファイル）</td>
                     <td>Vitest</td>
-                    <td>Node（DOM なし）</td>
-                </tr>
-                <tr>
-                    <td>DOM テスト</td>
-                    <td><code>tests/dom/</code></td>
-                    <td>Vitest + jsdom</td>
-                    <td>jsdom（DOM あり）</td>
+                    <td>jsdom（仮想DOM）</td>
                 </tr>
                 <tr>
                     <td>統合テスト</td>
@@ -409,20 +464,41 @@
                     <td>Playwright</td>
                     <td>Chromium（実ブラウザ）</td>
                 </tr>
+                <tr>
+                    <td>テスト用データ</td>
+                    <td><code>tests/fixtures/</code></td>
+                    <td>―</td>
+                    <td>実際のWinMergeレポート・悪意あるサンプルHTML等</td>
+                </tr>
             </tbody>
         </table>
+        <div class="info-box">
+            <code>tests/unit/</code>・<code>tests/dom/</code>のようなディレクトリ分割は行っておらず、
+            対象モジュールと同じ粒度でテストファイルをフラットに並べる方針です
+            （例: <code>html-processor.js</code> → <code>tests/html-processor.test.js</code>）。
+            同一モジュールでもカバレッジ補強用に<code>*-extra.test.js</code> / <code>*-coverage.test.js</code>
+            のように分割されている場合があります。
+        </div>
         <h3>テスト実行コマンド</h3>
         <pre><code># ユニット・統合テスト（1回実行）
 npm test
 
-# カバレッジレポート付き
+# カバレッジレポート付き（@vitest/coverage-v8）
 npm run test:coverage
 
 # ファイル変更を監視
 npm run test:watch
 
+# 統合テストのみ（詳細ログ付き）
+npm run test:integration
+
 # E2E テスト
-npm run test:e2e</code></pre>
+npm run test:e2e
+
+# 静的解析（JS / CSS）
+npm run lint
+npm run lint:css
+npm run lint:all</code></pre>
         <div class="back-to-top"><a href="#top"><i class="fas fa-chevron-up"></i>トップへ戻る</a></div>
     </div>
 
@@ -431,11 +507,19 @@ npm run test:e2e</code></pre>
         <h2><i class="fas fa-bug mr-0_5rem"></i>デバッグ方法</h2>
         <p>URL に <code>?debug=true</code> を付けるか、<code>localhost</code> / <code>127.0.0.1</code> で開くとデバッグモードが有効になります。</p>
         <h3>ブラウザコンソールで使用可能なデバッグ関数</h3>
+        <p>
+            デバッグモードでは <code>window.WinMergeViewer</code> に加えて、短縮エイリアス
+            <code>window.wmv</code> と <code>window.debug</code>（<code>wmv.debug</code>と同じ）が公開されます。
+        </p>
         <pre><code>wmv.debug.showBlocks()      // 差分ブロック統計・一覧
 wmv.debug.visualizeBlocks() // ブロックを色枠で視覚化
-wmv.debug.memoryStatus()    // メモリ使用量
+wmv.debug.blockMode()       // 現在のブロック数・currentDiffIndexを表示
+wmv.debug.memoryStatus()    // メモリ使用量（performance.memory）
 wmv.debug.appState()        // AppState の状態ダンプ
-wmv.debug.all()             // 上記すべて</code></pre>
+wmv.debug.all()             // memoryStatus・appState・blockModeをまとめて表示
+
+// 上記はすべて debug.xxx() の形でも呼び出せる
+debug.all()</code></pre>
         <div class="back-to-top"><a href="#top"><i class="fas fa-chevron-up"></i>トップへ戻る</a></div>
     </div>
 
@@ -457,33 +541,70 @@ wmv.debug.all()             // 上記すべて</code></pre>
         <div class="back-to-top"><a href="#top"><i class="fas fa-chevron-up"></i>トップへ戻る</a></div>
     </div>
 
-    <!-- ブランチ戦略 -->
+    <!-- CI/CD・デプロイ -->
     <div class="section-box" id="branch-strategy">
-        <h2><i class="fas fa-code-branch mr-0_5rem"></i>ブランチ戦略</h2>
+        <h2><i class="fas fa-code-branch mr-0_5rem"></i>CI/CD・デプロイ</h2>
+        <div class="warning-box">
+            <strong>⚠ 以前の運用からの変更点</strong><br>
+            かつては <code>gh-pages</code> ブランチへ <code>git checkout</code> でファイルを手動コピーして
+            公開する運用でしたが、現在は <code>.github/workflows/deploy-pages.yml</code> により
+            <code>main</code> ブランチから直接・自動でGitHub Pagesへデプロイされる方式に置き換わっています。
+            <code>gh-pages</code> ブランチへの手動反映作業は不要です。
+        </div>
+
+        <h3>CI：<code>.github/workflows/test.yml</code></h3>
+        <p><code>main</code>への <code>push</code> または <code>main</code> 宛のPull Requestのたびに、3つのジョブが並列実行されます。</p>
         <table>
             <thead>
-                <tr><th>ブランチ</th><th>用途</th><th>内容</th></tr>
+                <tr><th>ジョブ</th><th>内容</th></tr>
             </thead>
             <tbody>
-                <tr>
-                    <td><code>main</code></td>
-                    <td>開発・CI</td>
-                    <td>ソースコード・テスト・設定ファイルすべてを含む開発用ブランチ</td>
-                </tr>
-                <tr>
-                    <td><code>gh-pages</code></td>
-                    <td>配布・公開</td>
-                    <td>配布用ファイルのみ（index.html / style.css / js/ / document.html 等）</td>
-                </tr>
+                <tr><td>unit-test</td><td><code>npm ci</code> → Vitestでカバレッジ付き単体テストを実行。カバレッジレポートはArtifacts（30日保存）に保存</td></tr>
+                <tr><td>lint</td><td>ESLint（JS）とStylelint（CSS）で静的解析</td></tr>
+                <tr><td>e2e-test</td><td>Playwright（Chromium）で実ブラウザテストを実行。失敗時はスクリーンショットをArtifactsに保存</td></tr>
             </tbody>
         </table>
-        <h3>gh-pages 更新手順</h3>
-        <pre><code>git checkout gh-pages
-git checkout main -- index.html style.css favicon.ico document.html js/
-git add .
-git commit -m "chore: update gh-pages"
-git push origin gh-pages
-git checkout main</code></pre>
+
+        <h3>CD：<code>.github/workflows/deploy-pages.yml</code></h3>
+        <p>
+            <code>index.html</code> / <code>document.html</code> / <code>style.css</code> / <code>favicon.ico</code> /
+            <code>js/**</code> のいずれかが <code>main</code> に変更として入った時だけ発火します
+            （<code>workflow_dispatch</code>での手動実行も可能）。
+        </p>
+        <ol>
+            <li>リポジトリをチェックアウト</li>
+            <li>公開に必要な静的ファイルだけを <code>pages-dist/</code> に集める（<code>node_modules</code>・テストコード・設定ファイルは含めない）</li>
+            <li><code>actions/upload-pages-artifact</code> でアーティファクト化し、<code>actions/deploy-pages</code> で直接GitHub Pagesへデプロイ</li>
+        </ol>
+        <div class="info-box">
+            <code>concurrency</code> 設定により、連続してpushがあった場合は古いデプロイを打ち切り最新のものだけを
+            反映するため、デプロイが競合して壊れることを防いでいます。
+        </div>
+
+        <h3>ローカルでの品質ゲート（コミット時）</h3>
+        <p>
+            CIより手前、<code>git commit</code> の瞬間にも品質チェックが仕込まれています。
+            <code>package.json</code> の <code>lint-staged</code> 設定と Husky の <code>pre-commit</code> フックにより、
+            コミットのたびにステージされたファイルだけ ESLint・Prettier（JS）や Stylelint・Prettier（CSS）が
+            自動実行されます。CIで初めて問題に気づくのではなく、コミットの時点で機械的に直せる問題（整形崩れ等）は
+            直してしまう「シフトレフト」の実践です。
+        </p>
+
+        <h3>全体の流れ</h3>
+        <pre><code>git commit（Husky/lint-staged でローカル整形・簡易チェック）
+   ↓
+git push（test.yml: unit-test / lint / e2e-test を並列実行）
+   ↓
+main への反映が対象ファイルを含む場合（deploy-pages.yml が発火）
+   ↓
+GitHub Pages へ自動デプロイ</code></pre>
+
+        <h3>依存関係の自動更新</h3>
+        <p>
+            <code>.github/dependabot.yml</code> により、npm依存パッケージの更新PRが週次で自動作成されます
+            （同時オープンPR数は5件まで）。既知の脆弱性を含む古い依存を放置しないための仕組みです。
+        </p>
+
         <div class="back-to-top"><a href="#top"><i class="fas fa-chevron-up"></i>トップへ戻る</a></div>
     </div>
 
