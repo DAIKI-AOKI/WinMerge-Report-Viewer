@@ -51,6 +51,18 @@ npm run test:e2e
 - JavaScript の構文チェックは [ESLint](https://eslint.org/)（`eslint.config.js`）、CSS は [Stylelint](https://stylelint.io/)（`.stylelintrc.json`）に従います。
 - 既存のモジュール構成（`js/` 以下、機能ごとに1ファイル）に沿って追加・変更してください。
 
+## DOMPurify のバージョン更新について
+
+`js/vendor/purify.es.js` は `package.json` の `dompurify` バージョンに合わせて同梱している、ビルドステップなしで直接 import できる ESM バンドルです。
+
+- **Dependabot が更新PRを作成した場合**（推奨フロー）: `.github/workflows/dompurify-sync-bot.yml` が自動的に `npm run sync:dompurify` を実行し、差分があればそのPRブランチに同期コミットを追加します。人がやることは通常のPRレビュー・マージだけです。
+- **手動でバージョンを上げる場合**: `package.json` の `dompurify` を更新した後、必ず以下を実行してコミットしてください。
+  ```bash
+  npm install
+  npm run sync:dompurify
+  ```
+  これを忘れると、CI の `dompurify-sync-check` ジョブが失敗します（`js/vendor/purify.es.js` が `package.json` のバージョンと一致しているかを機械的に検証しています）。
+
 ## コミットメッセージ
 
 `種別: 内容` の形式を推奨しています（例: `fix: ○○のバグを修正`、`feat: ○○機能を追加`、`test: ○○のテストを追加`、`refactor: ○○を整理`、`docs: ○○を更新`、`chore: ○○`）。日本語・英語どちらでも構いません。

@@ -1,0 +1,80 @@
+name: DOMPurifyバンドル自動同期
+# Dependabotがpackage.jsonのdompurifyバージョンを上げるPRを作成した際、
+# js/vendor/purify.es.js への反映（npm run sync:dompurify）を自動で行い、
+# 差分があればそのPRブランチにコミットする。
+#
+# これにより、test.yml の dompurify-sync-check ジョブが赤くなる前に
+# 同期コミットが追加された状態でCIが走るようになり、人手での
+# 「npm run sync:dompurify を実行してコミット」という作業が不要になる。
+#
+# セキュリティ上の注意:
+# - Dependabotが作成するPRは同一リポジトリ内のブランチであり、fork PRではない
+#   （fork PRのpull_requestイベントに適用される読み取り専用トークン制限は対象外）。
+# - GitHubの仕様により、Dependabotがトリガーしたワークフローには GITHUB_TOKEN 以外の
+#   リポジトリシークレットは渡されない。本ワークフローも GITHUB_TOKEN のみを使用する。
+# - actor を dependabot[bot] に限定することで、人間が作成した通常のPRでは
+#   このワークフローが書き込み権限で動作しないようにしている。
+on:
+  pull_request:
+    branches: [ main ]
+    types: [ opened, synchronize, reopened ]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dompurify-sync-bot-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  sync-dompurify-bundle:
+    name: DOMPurifyバンドルを同期してコミット
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Dependabot PRは同一リポジトリのブランチなので、PRのheadブランチを
+          # 直接チェックアウトしてそこにコミットを追加できる。
+          ref: ${{ github.event.pull_request.head.ref }}
+          # デフォルトトークンでpushできるよう、認証情報を保持する。
+          persist-credentials: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 依存パッケージをインストール
+        run: npm ci
+
+      - name: DOMPurifyバンドルを再生成
+        # package.json の dompurify が変わっていない通常のDependabot PR
+        # （他パッケージの更新など）では、このコマンドを実行しても
+        # js/vendor/purify.es.js に差分は出ない。差分の有無だけで
+        # 「同期が必要だったか」を判定すれば十分なので、変更検知は
+        # 事前ステップではなく後段のdiffステップに委ねている。
+        run: npm run sync:dompurify
+
+      - name: 差分を確認
+        id: diff
+        run: |
+          if git diff --quiet -- js/vendor/purify.es.js; then
+            echo "has_diff=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_diff=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 同期コミットをpush
+        if: steps.diff.outputs.has_diff == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add js/vendor/purify.es.js
+          git commit \
+            -m "chore: DOMPurifyバンドルをpackage.jsonのバージョンに同期" \
+            -m "npm run sync:dompurify の自動実行によるコミット（dompurify-sync-bot workflow）"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
+
+      - name: 同期不要だった場合のログ
+        if: steps.diff.outputs.has_diff == 'false'
+        run: echo "js/vendor/purify.es.js は既に package.json の dompurify バージョンと一致しています。"
