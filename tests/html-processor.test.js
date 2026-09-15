@@ -223,13 +223,17 @@ describe('HTMLProcessor.importStyles()', () => {
         expect(AppState.importedStyleElem).toBeNull();
     });
 
-    it('WinMerge CSS のセレクターが #viewer 配下にスコープされる', () => {
+    it('WinMerge CSS のセレクターが #viewer / #fixedHeader 配下にスコープされる', () => {
+        // #fixedHeader は setupFixedHeader() が #viewer 内の th を複製して作る
+        // #viewer の兄弟要素（DOM上は外側）。複製されたth（class属性はコピーされる）にも
+        // レポート側のCSS（見出しセルの背景色等）が効くよう、#viewer と #fixedHeader の
+        // 両方にスコープする。
         const doc = parseHTML('<html><head><style>body{color:red} table{margin:0} .diff, td{background:yellow}</style></head></html>');
         HTMLProcessor.importStyles(doc);
         const css = AppState.importedStyleElem.textContent;
-        expect(css).toContain('#viewer {');
-        expect(css).toContain('#viewer table {');
-        expect(css).toContain('#viewer .diff, #viewer td {');
+        expect(css).toContain('#viewer, #fixedHeader {');
+        expect(css).toContain('#viewer table, #fixedHeader table {');
+        expect(css).toContain('#viewer .diff, #fixedHeader .diff, #viewer td, #fixedHeader td {');
         expect(css).not.toMatch(/(^|[}\n])\s*(body|table|\.diff|td)\s*\{/);
     });
 
@@ -551,11 +555,18 @@ button, input, .toolbar { visibility: hidden !important; }
 
     it('#viewer を子孫として辿る通常セレクターは引き続き display 等を使える（誤検知しない）', () => {
         const css = runPipeline('<html><head><style>div{display:none}</style></head><body></body></html>');
-        expect(css).toContain('#viewer div {display:none}');
+        expect(css).toContain('#viewer div, #fixedHeader div {display:none}');
     });
 
-    it('危険プロパティを含まない body ルールは従来どおり #viewer にスコープされる（既存挙動の回帰なし）', () => {
+    it('危険プロパティを含まない body ルールは従来どおり #viewer / #fixedHeader にスコープされる（既存挙動の回帰なし）', () => {
         const css = runPipeline('<html><head><style>body{color:red;font-family:Arial}</style></head><body></body></html>');
-        expect(css).toContain('#viewer {color:red;font-family:Arial}');
+        expect(css).toContain('#viewer, #fixedHeader {color:red;font-family:Arial}');
+    });
+
+    it('固定ヘッダー（#fixedHeader）にも見出しセル用クラスの背景色が効く（スクロール時の白抜けバグの回帰テスト）', () => {
+        // #fixedHeader は #viewer と同じ見た目になるべき複製ヘッダーなので、
+        // .title のようなクラスベースの装飾は両方に適用されなければならない。
+        const css = runPipeline('<html><head><style>.title{color:white;background-color:blue;}</style></head><body></body></html>');
+        expect(css).toContain('#viewer .title, #fixedHeader .title {color:white;background-color:blue;}');
     });
 });

@@ -116,23 +116,27 @@ const HTMLProcessor = {
     },
 
     /**
-     * html/body/:root を #viewer に読み替えた結果、そのルールが
-     * 「#viewer要素そのもの」を（コンビネータを介さず直接）選択しうるかどうかを判定する。
-     * 例: "#viewer", "#viewer:hover", "#viewer::before", "#viewer[data-x]" → true
-     *     "#viewer div", "#viewer > div", "#viewer.foo" 相当のコンビネータ付きは false
-     * #viewer自体が選択される場合、display/visibility等でビューア表示領域そのものを
-     * 消し去られてしまうため、そうしたプロパティだけは別途除去する。
+     * html/body/:root をスコープルート（#viewer または #fixedHeader）に読み替えた結果、
+     * そのルールが「スコープルート要素そのもの」を（コンビネータを介さず直接）選択しうるか
+     * どうかを判定する。
+     * 例: root="#viewer" のとき "#viewer", "#viewer:hover", "#viewer[data-x]" → true
+     *     "#viewer div", "#viewer > div" 相当のコンビネータ付きは false
+     * スコープルート自体が選択される場合、display/visibility等でその要素（表示領域や
+     * 固定ヘッダー）そのものを消し去られてしまうため、そうしたプロパティだけは
+     * 別途除去する。
      * @private
      * @param {string} scopedSelector - スコープ変換後の単一セレクター
+     * @param {string} root - スコープルートのセレクター（例: '#viewer'）
      * @returns {boolean}
      */
-    _isViewerRootSelector(scopedSelector) {
-        // スペース／子・隣接・一般兄弟コンビネータが含まれていれば「#viewer自身」ではなく
+    _isBareRootSelector(scopedSelector, root) {
+        // スペース／子・隣接・一般兄弟コンビネータが含まれていれば「ルート自身」ではなく
         // その配下・周辺の別要素を指すセレクターなので対象外。
         if (/[\s>+~]/.test(scopedSelector)) return false;
-        // 単一コンパウンドセレクターとして #viewer から始まっているか
-        // （疑似クラス・疑似要素・属性セレクターの付加は許容し、依然として#viewer自身を指す）
-        return /^#viewer(?:$|[:.[])/.test(scopedSelector);
+        // 単一コンパウンドセレクターとして root から始まっているか
+        // （疑似クラス・疑似要素・属性セレクターの付加は許容し、依然としてroot自身を指す）
+        const escapedRoot = root.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return new RegExp(`^${escapedRoot}(?:$|[:.[])`).test(scopedSelector);
     },
 
     /**
@@ -188,17 +192,47 @@ const HTMLProcessor = {
     },
 
     /**
-     * WinMergeレポートのCSSをViewer領域に限定する。
+     * セレクターの1パーツ（comma区切りの1要素）を、指定したスコープルート配下の
+     * セレクターに変換する。
+     * @private
+     * @param {string} trimmed - トリム済みの単一セレクター
+     * @param {string} root - スコープルートのセレクター（例: '#viewer'）
+     * @returns {string} スコープ変換後のセレクター
+     */
+    _scopeSelectorToRoot(trimmed, root) {
+        if (/^(html|body|:root)$/i.test(trimmed)) {
+            return root;
+        } else if (/^html\s+/i.test(trimmed)) {
+            return root + trimmed.replace(/^html/i, '');
+        } else if (/^body\s*/i.test(trimmed)) {
+            return root + trimmed.replace(/^body/i, '');
+        }
+        return root + ' ' + trimmed;
+    },
+
+    /**
+     * WinMergeレポートのCSSを、表示領域（#viewer）とスクロール固定ヘッダー
+     * （#fixedHeader）の両方に限定する。
+     *
+     * 固定ヘッダーは#viewer内のth要素をJS側（table-processor.jsのsetupFixedHeader）が
+     * 複製して作る、#viewerの兄弟要素（DOM上は外側）である。そのため #viewer だけに
+     * スコープすると、複製されたth（class属性はそのままコピーされる）に対して
+     * レポート側のCSS（見出しセルの背景色等）が一切効かず、スクロール時に
+     * 固定ヘッダーの背景が白く抜けて見える不具合が生じる。これを避けるため、
+     * 危険性のない通常のセレクターは #viewer と #fixedHeader の両方に対して
+     * 展開する。
      * @param {string} css - 安全性検査済みのCSS
-     * @returns {string} #viewer 配下にスコープしたCSS
+     * @returns {string} #viewer / #fixedHeader 配下にスコープしたCSS
      */
     _scopeCss(css) {
         // @import / url() 等は _sanitizeStyleText() で拒否済み。
         // WinMergeの標準レポートは通常のスタイルルールのみで構成されるため、
-        // セレクター部分だけを #viewer 配下へ限定する。
+        // セレクター部分だけを #viewer / #fixedHeader 配下へ限定する。
         // ここでは宣言ブロック（{ と } の間）も併せて取得し、html/body/:root 由来で
-        // #viewer要素そのものを指してしまうセレクターについては、表示/操作を無効化
-        // しうるプロパティだけを追加で除去する（CSSスコープエスケープ対策）。
+        // スコープルート要素そのものを指してしまうセレクターについては、表示/操作を
+        // 無効化しうるプロパティだけを追加で除去する（CSSスコープエスケープ対策）。
+        const SCOPE_ROOTS = ['#viewer', '#fixedHeader'];
+
         return css.replace(/([^{}]+)\{([^{}]*)\}/g, (match, selectorText, declText) => {
             const selector = selectorText.trim();
             if (!selector || selector.startsWith('@')) return match;
@@ -210,30 +244,23 @@ const HTMLProcessor = {
                 const trimmed = part.trim();
                 if (!trimmed) return;
 
-                let scoped;
-                if (/^(html|body|:root)$/i.test(trimmed)) {
-                    scoped = '#viewer';
-                } else if (/^html\s+/i.test(trimmed)) {
-                    scoped = '#viewer' + trimmed.replace(/^html/i, '');
-                } else if (/^body\s*/i.test(trimmed)) {
-                    scoped = '#viewer' + trimmed.replace(/^body/i, '');
-                } else {
-                    scoped = '#viewer ' + trimmed;
-                }
+                SCOPE_ROOTS.forEach((root) => {
+                    const scoped = this._scopeSelectorToRoot(trimmed, root);
 
-                if (this._isViewerRootSelector(scoped)) {
-                    const filtered = this._stripViewerHidingDeclarations(declText);
-                    if (filtered.trim() === declText.trim()) {
-                        // 危険なプロパティを含まないので通常どおり結合してよい
+                    if (this._isBareRootSelector(scoped, root)) {
+                        const filtered = this._stripViewerHidingDeclarations(declText);
+                        if (filtered.trim() === declText.trim()) {
+                            // 危険なプロパティを含まないので通常どおり結合してよい
+                            normalSelectors.push(scoped);
+                        } else if (filtered.trim()) {
+                            // 一部のプロパティのみ除去したものを個別ルールとして出力する
+                            restrictedRules.push(`${scoped} {${filtered}}`);
+                        }
+                        // filtered が空文字列 = 危険なプロパティしかなかったのでルール自体を破棄
+                    } else {
                         normalSelectors.push(scoped);
-                    } else if (filtered.trim()) {
-                        // 一部のプロパティのみ除去したものを個別ルールとして出力する
-                        restrictedRules.push(`${scoped} {${filtered}}`);
                     }
-                    // filtered が空文字列 = 危険なプロパティしかなかったのでルール自体を破棄
-                } else {
-                    normalSelectors.push(scoped);
-                }
+                });
             });
 
             let result = '';
