@@ -23,6 +23,12 @@ import DOMPurify from './vendor/purify.es.js';
 // DOMPurifyは許可した属性(style含む)の「値の中身」までは検証しない仕様のため、
 // style属性については追加でCSSインジェクションパターンを検証するフックを登録する。
 // importStyles()でのCSS安全化と同じ判定基準に揃えている。
+//
+// NOTE: このaddHook()はモジュール読み込み時に一度だけ実行され、DOMPurifyの
+// シングルトンインスタンスに永続的に登録される。sanitize()は複数回呼ばれる
+// 設計だが、呼び出しごとに再登録されるわけではない。誤って sanitize() の
+// 内部（メソッド本体）に移動すると、ファイルを読み込むたびに同じフックが
+// 重複登録されることになるため、このモジュールトップレベルの位置を維持すること。
 DOMPurify.addHook('uponSanitizeAttribute', (node, data) => {
     if (data.attrName === 'style' && data.attrValue) {
         if (
@@ -278,12 +284,18 @@ const HTMLProcessor = {
      * 危険な構文を含むCSSブロックを丸ごと破棄する。
      * CSSパーサーを導入していないため、外部リソース読み込みや旧式実行機能を
      * 含むブロックは部分修正せず拒否する（fail closed）。
+     *
+     * @media/@supports/@keyframes等のネストした@ルールも、_scopeCss()の
+     * 単純な{}マッチングでは正しく扱えない（内側の"}"で誤って終端してしまい、
+     * 内側のセレクターがスコープされずに残る可能性がある）ため、
+     * 同じfail closedの方針でブロックごと拒否する。WinMergeの標準レポートは
+     * これらの構文を出力しないため、実害のあるケースは想定していない。
      * @param {string} css - 検査対象のCSS
      * @returns {string} 安全と判定したCSS、または空文字列
      */
     _sanitizeStyleText(css) {
         const dangerousPattern =
-            /expression\s*\(|javascript\s*:|vbscript\s*:|@import|behavior\s*:|binding\s*:|url\s*\(/i;
+            /expression\s*\(|javascript\s*:|vbscript\s*:|@import|@media|@supports|@keyframes|@font-face|@page|@container|behavior\s*:|binding\s*:|url\s*\(/i;
         return dangerousPattern.test(css) ? '' : css;
     },
 

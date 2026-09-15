@@ -40,6 +40,28 @@ jobs:
       - name: Stylelintを実行
         run: npm run lint:css
 
+  dompurify-sync-check:
+    name: DOMPurifyバンドルの追従確認
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: 依存パッケージをインストール
+        run: npm ci
+      - name: DOMPurifyバンドルを再生成
+        run: npm run sync:dompurify
+      - name: 差分がないことを確認
+        # package.json の dompurify を更新したのに
+        # js/vendor/purify.es.js への反映（npm run sync:dompurify の実行と
+        # コミット）を忘れると、ここで検知される
+        run: |
+          if ! git diff --exit-code -- js/vendor/purify.es.js; then
+            echo "::error::js/vendor/purify.es.js が package.json の dompurify バージョンと一致していません。'npm run sync:dompurify' を実行してコミットしてください。"
+            exit 1
+          fi
+
   e2e-test:
     name: E2Eテスト
     runs-on: ubuntu-latest

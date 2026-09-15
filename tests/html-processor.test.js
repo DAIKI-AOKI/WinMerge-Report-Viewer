@@ -217,6 +217,12 @@ describe('HTMLProcessor.importStyles()', () => {
         expect(AppState.importedStyleElem.textContent).toBe('');
     });
 
+    it('@media を含む style ブロック全体を破棄する（_scopeCss の {} マッチングがネストを正しく扱えないため fail closed）', () => {
+        const doc = parseHTML('<html><head><style>@media (min-width: 600px){.diff{color:red}}</style></head></html>');
+        HTMLProcessor.importStyles(doc);
+        expect(AppState.importedStyleElem.textContent).toBe('');
+    });
+
     it('style タグがない場合は importedStyleElem が null のまま', () => {
         const doc = parseHTML('<html><head></head></html>');
         HTMLProcessor.importStyles(doc);
