@@ -4,4 +4,19 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    # devDependenciesの細切れPRが枠を埋めて、dompurifyのような本番依存の
+    # 更新PRが作られなくなる事態を防ぐため、枠を少し広めに確保しておく。
+    open-pull-requests-limit: 10
+    groups:
+      # devDependenciesのminor/patch更新は、個別PRではなく週1回まとめて
+      # 1本のPRにする。これにより枠の消費を大幅に抑えられる。
+      # dompurify（dependencies側）はこのグループの対象外なので、
+      # 引き続き独立したPRとして作成される。
+      dev-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+    # メジャーアップデート（例: jsdom 25→30 のような破壊的変更を伴いうる更新）は
+    # グループ化せず個別PRのままにする。まとめてしまうと、どの更新が原因で
+    # テストが壊れたか追いにくくなるため、目立たせておいた方が安全。
