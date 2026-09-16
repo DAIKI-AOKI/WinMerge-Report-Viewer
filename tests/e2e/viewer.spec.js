@@ -97,6 +97,16 @@ test.describe('キーボードショートカット', () => {
         await page.locator('#fileInput').setInputFiles(filePath);
         await expect(page.locator('#viewer table')).toBeVisible({ timeout: 5000 });
 
+        // #viewer table への追加（_stepDetect）と、nextDiffButton/prevDiffButton が
+        // 実際に押せる状態になること（_stepRender）は別々の非同期ステップで、
+        // わずかにタイミングがズレる。page.keyboard.press() はクリックと違って
+        // 対象要素の準備完了を自動で待ってくれないため、ここで明示的に
+        // ボタンの表示を待ってからキー操作に進む（さもないと、ボタンがまだ
+        // button-hidden のうちにショートカットを送ってしまい、仕様通り
+        // 何も起こらないまま無視されて失敗することがある）。
+        await expect(page.locator('#nextDiffButton')).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('#prevDiffButton')).toBeVisible({ timeout: 5000 });
+
         // setInputFiles() 実行後は #fileInput（<input>）自体にフォーカスが
         // 残ったままになる。handleKeydown() は誤操作防止のため input/textarea/
         // contenteditable にフォーカスがある間はショートカットを発火させない
