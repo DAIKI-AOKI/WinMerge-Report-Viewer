@@ -46,8 +46,11 @@ npx serve .
 ## ファイル構成
 
 ```
-├── index.html
+├── index.html                # アプリ本体
+├── document.html             # 利用ガイド（エンドユーザー向け）
+├── document-dev.html         # 開発者ガイド（GitHub Pagesには非公開）
 ├── style.css
+├── favicon.ico
 ├── js/
 │   ├── main.js               # エントリーポイント・初期化
 │   ├── config.js             # 設定定数
@@ -66,6 +69,8 @@ npx serve .
 │   ├── utils.js              # 汎用ユーティリティ
 │   └── vendor/
 │       └── purify.es.js      # DOMPurify（HTMLサニタイズライブラリ、同梱）
+├── scripts/
+│   └── sync-dompurify.mjs    # DOMPurifyバンドル同期スクリプト（npm run sync:dompurify）
 └── tests/
     ├── *.test.js             # ユニット・DOMテスト（Vitest）
     ├── integration/          # 統合テスト（モジュール間連携）
